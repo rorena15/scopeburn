@@ -96,6 +96,15 @@ td.title { max-width: 420px; }
 .empty { color: var(--muted); padding: 24px 0; text-align: center; }
 .hidden { display: none !important; }
 .foot { color: var(--muted); font-size: 12px; margin-top: 24px; }
+.info { all: unset; display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; margin-left: 6px; border-radius: 50%; border: 1px solid var(--axis); color: var(--muted); font-size: 11px; font-weight: 600; cursor: help; vertical-align: 1px; }
+.info:hover, .info:focus-visible, .info[aria-expanded="true"] { color: var(--ink); border-color: var(--ink-2); }
+.tip .help { color: var(--ink-2); white-space: pre-line; line-height: 1.5; }
+details.glossary summary { cursor: pointer; font-weight: 600; font-size: 15px; }
+details.glossary dl { display: grid; grid-template-columns: minmax(140px, 220px) 1fr; gap: 8px 16px; margin: 12px 0 0; font-size: 13px; }
+details.glossary dt { font-weight: 600; }
+details.glossary dd { margin: 0; color: var(--ink-2); white-space: pre-line; }
+details.glossary h3 { grid-column: 1 / -1; font-size: 12px; color: var(--muted); margin: 12px 0 0; font-weight: 600; }
+@media (max-width: 720px) { details.glossary dl { grid-template-columns: 1fr; } }
 @media (max-width: 720px) { .sim { grid-template-columns: 1fr; } td.title { max-width: 200px; } }
 </style>
 </head>
@@ -138,6 +147,8 @@ td.title { max-width: 420px; }
   </section>
 
   <section id="detail"></section>
+
+  <section class="card"><details class="glossary" id="glossary"></details></section>
 
   <p class="foot" id="foot"></p>
 </main>
@@ -194,6 +205,73 @@ const T = {
     reactiveBadge: '대부분 계획 밖 작업',
   },
 };
+
+// ---------- metric definitions (shown by ⓘ and in the glossary) ----------
+const HELP = {
+  en: {
+    _title: 'How each number is calculated',
+    _progress: 'Progress', _cost: 'Cost', _limits: 'Subscription limits',
+    points: ['Points', 'Item size as a number: S=1, M=2, L=4, XL=8 (no size = M).\nOnly the lowest-level items count; a parent item just groups its children.'],
+    scope: ['Scope', 'Sum of points of every item that is not cut.'],
+    done: ['Done', 'Sum of points of items marked [x].'],
+    remaining: ['Remaining', 'Scope − Done. When this line goes down you are getting closer to finishing.'],
+    growth: ['Scope growth', 'Scope added in the last 14 days ÷ points finished in the same 14 days.\nAbove 1 = the finish line is moving away.'],
+    waiting: ['Waiting', 'Decided (@decided or first written down) but never started (no @start).\nCards flag items waiting 14+ days.'],
+    mix: ['Planned vs picked up at once', 'Points finished in the last 30 days, split by how long the item sat before work began:\n• picked up at once: decided → start (or done, if no @start) ≤ 1 day\n• planned ahead: longer than that\nItems that first appeared already done and have no @decided are left out (unknown).'],
+    lead: ['Days (decided → done)', 'For done items: days from decided to done.\nFor open items: days since decided.'],
+    spend: ['Spend (API-equivalent)', 'Tokens × official API prices (cache reads/writes priced separately).\nOn a subscription this is what the same usage would cost on the API, not your bill.'],
+    byProject: ['Spend by project', "Each Claude response goes to the git repo whose files its tools touched.\nResponses without file paths follow the rest of the same prompt, then the session.\nNon-git folders inside a folder of repos count as projects."],
+    onRoadmap: ['On roadmap items', "Share of the project's spend assigned to roadmap items:\n① a commit mentioning {ID} takes the spend since the previous commit\n② otherwise, items in progress at that moment share it by points\n③ the rest is 'outside the roadmap'."],
+    perPoint: ['Cost per point', "Median of (item spend ÷ item points) over this project's finished items.\nWith fewer than 5 finished items, the median across all projects is used."],
+    toFinish: ['Cost to finish', 'Remaining points (checked items) × cost per point.\nIf a 5-hour cap estimate exists, also shown as a number of 5-hour windows.'],
+    fiveHour: ['5-hour window', 'Rebuilt from activity: starts at the first response (rounded down to the hour) and lasts 5 hours, unless Claude Code reported the exact reset time.\nBurn = spend in the last 45 minutes, per hour.\nCap = estimated from /usage percentages you record (calibrate).'],
+    weekly: ['Weekly window', 'Needs a reset time from Claude Code (status line) to know where the week starts.'],
+    imported: ['Sessions run elsewhere', "Sessions that ran on another machine or in the cloud and were copied into this machine's logs.\nThey use the same account limits, so they're included by default."],
+  },
+  ko: {
+    _title: '숫자는 이렇게 계산해요',
+    _progress: '진행', _cost: '비용', _limits: '구독 한도',
+    points: ['점수', '항목 크기를 숫자로 바꾼 값: S=1, M=2, L=4, XL=8 (크기가 없으면 M).\n하위 항목이 있으면 하위 항목만 세요. 상위 항목은 묶음일 뿐이에요.'],
+    scope: ['범위', '잘라낸 항목을 뺀 모든 항목의 점수 합.'],
+    done: ['완료', '[x]로 표시된 항목의 점수 합.'],
+    remaining: ['남은 점수', '범위 − 완료. 이 선이 내려가야 끝에 가까워지는 거예요.'],
+    growth: ['범위 증가율', '최근 14일에 늘어난 범위 ÷ 같은 14일에 끝낸 점수.\n1보다 크면 끝이 멀어지는 중이에요.'],
+    waiting: ['대기', '결정은 했지만(@decided, 또는 처음 적힌 날) 시작하지 않은(@start 없음) 항목.\n14일 넘게 대기 중이면 카드에 배지가 붙어요.'],
+    mix: ['미리 계획한 일 / 추가되자마자 처리한 일', '최근 30일에 끝낸 점수를, 손대기 전까지 얼마나 기다렸는지로 나눠요.\n• 추가되자마자 처리: 결정한 날 → 시작한 날(없으면 완료한 날)이 1일 이하\n• 미리 계획: 그보다 오래\n처음부터 완료 상태로 나타났고 @decided도 없는 항목은 알 수 없어서 빼요.'],
+    lead: ['걸린 날 (결정 → 완료)', '완료 항목: 결정한 날부터 완료한 날까지.\n남은 항목: 결정한 지 며칠 지났는지.'],
+    spend: ['사용 금액 (API 환산)', '토큰 × 공식 API 단가 (캐시 읽기·쓰기는 따로 계산).\n구독이라면 같은 사용량을 API로 썼을 때의 값이고, 실제 청구액이 아니에요.'],
+    byProject: ['프로젝트별 금액', 'Claude 응답마다, 그 응답이 건드린 파일이 속한 git 저장소로 보내요.\n파일 경로가 없는 응답은 같은 질문 안의 다른 응답, 그다음 세션을 따라가요.\n저장소 여러 개를 담은 폴더 안의 git이 아닌 폴더도 프로젝트로 셉니다.'],
+    onRoadmap: ['로드맵 연결 %', "프로젝트 금액 중 로드맵 항목에 배분된 비율.\n① 커밋 메시지에 {ID}가 있으면 직전 커밋 이후 금액을 그 항목이 가져가요\n② 아니면 그 시점에 진행 중인 항목들이 점수 비율로 나눠요\n③ 나머지는 '로드맵 밖'이에요."],
+    perPoint: ['점당 비용', '이 프로젝트 완료 항목들의 (항목 금액 ÷ 점수) 중앙값.\n완료 항목이 5개 미만이면 모든 프로젝트를 합친 중앙값을 써요.'],
+    toFinish: ['끝내는 비용', '남은 점수(체크된 항목) × 점당 비용.\n5시간 한도 추정치가 있으면 5시간 구간 몇 번인지도 보여줘요.'],
+    fiveHour: ['5시간 구간', '활동으로 되짚은 구간: 첫 응답 시각(정각으로 내림)부터 5시간. Claude Code가 정확한 재설정 시각을 알려주면 그 값을 써요.\n소모 = 최근 45분 사용 금액을 시간당으로 환산.\n한도 = 직접 입력한 /usage 사용률(calibrate)로 추정.'],
+    weekly: ['주간 구간', '주가 언제 시작하는지 알려면 Claude Code(상태줄)가 주는 재설정 시각이 필요해요.'],
+    imported: ['다른 곳에서 실행된 세션', '다른 PC나 클라우드에서 실행된 뒤 이 PC 기록으로 옮겨진 세션이에요.\n같은 계정 한도를 쓰기 때문에 기본으로 포함해요.'],
+  },
+};
+const GLOSSARY = [['_progress', ['points', 'scope', 'done', 'remaining', 'growth', 'waiting', 'mix', 'lead']], ['_cost', ['spend', 'byProject', 'onRoadmap', 'perPoint', 'toFinish', 'imported']], ['_limits', ['fiveHour', 'weekly']]];
+const help = (k) => (HELP[lang()] || HELP.en)[k] ?? HELP.en[k];
+let pinnedInfo = null;
+/** ⓘ button: hover or focus shows the definition; click pins it until clicked again. */
+function info(key) {
+  const [title, body] = help(key);
+  const b = el('button', { class: 'info', type: 'button', 'aria-label': title, 'aria-expanded': 'false' }, 'i');
+  const show = () => { const r = b.getBoundingClientRect(); showTip({ clientX: r.right, clientY: r.bottom }, () => [el('div', { class: 't' }, title), el('div', { class: 'help' }, body)]); };
+  b.addEventListener('pointerenter', show);
+  b.addEventListener('focus', show);
+  b.addEventListener('pointerleave', () => { if (pinnedInfo !== b) hideTip(); });
+  b.addEventListener('blur', () => { if (pinnedInfo !== b) hideTip(); });
+  b.addEventListener('click', (e) => { e.stopPropagation(); if (pinnedInfo === b) { pinnedInfo = null; b.setAttribute('aria-expanded', 'false'); hideTip(); } else { if (pinnedInfo) pinnedInfo.setAttribute('aria-expanded', 'false'); pinnedInfo = b; b.setAttribute('aria-expanded', 'true'); show(); } });
+  return b;
+}
+document.addEventListener('click', () => { if (pinnedInfo) { pinnedInfo.setAttribute('aria-expanded', 'false'); pinnedInfo = null; hideTip(); } });
+function renderGlossary() {
+  const d = $('glossary');
+  const open = d.open;
+  d.replaceChildren(el('summary', {}, help('_title')), el('dl', {}, GLOSSARY.flatMap(([sec, keys]) => [el('h3', {}, help(sec)), ...keys.flatMap((k) => [el('dt', {}, help(k)[0]), el('dd', {}, help(k)[1])])])));
+  d.open = open;
+}
+const attachInfo = (selector, key) => { const n = document.querySelector(selector); if (n && !n.querySelector('.info')) n.append(info(key)); };
 
 // ---------- state (URL hash) ----------
 const st = { period: 30, project: 'all', model: 'all', imported: true, sel: null, lang: null, zoom: null, q: '', sort: 'decided', dir: 1, hidden: [], open: [], sim: {}, dailyTable: false };
@@ -285,6 +363,10 @@ function filteredRows() {
 function renderControls() {
   document.documentElement.lang = lang();
   for (const n of document.querySelectorAll('[data-i18n]')) n.textContent = t(n.dataset.i18n);
+  attachInfo('[data-i18n="dailySpend"]', 'spend');
+  attachInfo('[data-i18n="byProject"]', 'byProject');
+  attachInfo('[data-i18n="roadmaps"]', 'points');
+  attachInfo('label.check', 'imported');
   $('dailyTableBtn').textContent = st.dailyTable ? t('showChart') : t('showTable');
   const per = $('period');
   per.replaceChildren(...[7, 30, 90, 0].map((p) => el('button', { 'aria-pressed': String(st.period === p), onclick: () => { st.period = p; update(); } }, t('period')[p])));
@@ -329,9 +411,9 @@ function renderTiles(rows) {
     const days = st.period || Math.max(1, Math.round((Date.now() - toDate(DATA.daily[0]?.[0] || dayStr(new Date())).getTime()) / dayMs));
     feeNote = `${(usd / ((c.monthlyFeeUsd * days) / 30)).toFixed(1)}${t('usedFee')}`;
   }
-  tiles.push(el('div', { class: 'tile' }, el('div', { class: 'label' }, t('spend')), el('div', { class: 'value' }, fmtUsd(usd)), el('div', { class: 'note' }, `${fmtTok(tok)} ${t('tokens')}${feeNote ? ' · ' + feeNote : ''}`)));
+  tiles.push(el('div', { class: 'tile' }, el('div', { class: 'label' }, t('spend'), info('spend')), el('div', { class: 'value' }, fmtUsd(usd)), el('div', { class: 'note' }, `${fmtTok(tok)} ${t('tokens')}${feeNote ? ' · ' + feeNote : ''}`)));
   for (const [key, w] of [['fiveHour', DATA.limits.five], ['weekly', DATA.limits.week]]) {
-    if (!w) { tiles.push(el('div', { class: 'tile' }, el('div', { class: 'label' }, t(key)), el('div', { class: 'value' }, '—'), el('div', { class: 'note' }, t('noWindow')))); continue; }
+    if (!w) { tiles.push(el('div', { class: 'tile' }, el('div', { class: 'label' }, t(key), info(key)), el('div', { class: 'value' }, '—'), el('div', { class: 'note' }, t('noWindow')))); continue; }
     const cap = w.cap ? w.cap.median : null;
     const pct = w.reportedPct != null ? w.reportedPct : cap ? (w.spent / cap) * 100 : null;
     const left = Math.max(0, w.end - Date.now());
@@ -339,7 +421,7 @@ function renderTiles(rows) {
     const level = pct == null ? null : pct >= 90 ? 'critical' : pct >= 75 ? 'serious' : pct >= 50 ? 'warning' : 'good';
     const statusLabel = { good: 'OK', warning: '50%+', serious: '75%+', critical: '90%+' };
     tiles.push(el('div', { class: 'tile' },
-      el('div', { class: 'label' }, t(key), level ? el('span', { class: 'status', style: 'margin-left:8px' }, el('i', { style: `background:var(--${level})` }), statusLabel[level]) : null),
+      el('div', { class: 'label' }, t(key), info(key), level ? el('span', { class: 'status', style: 'margin-left:8px' }, el('i', { style: `background:var(--${level})` }), statusLabel[level]) : null),
       el('div', { class: 'value' }, pct != null ? `${Math.round(pct)}%` : fmtUsd(w.spent)),
       pct != null ? el('div', { class: 'meter', role: 'meter', 'aria-valuenow': Math.round(pct), 'aria-valuemin': 0, 'aria-valuemax': 100 }, el('span', { style: `width:${Math.min(100, pct)}%` })) : null,
       el('div', { class: 'note' }, [
@@ -500,13 +582,13 @@ function renderDetail() {
   const onRoadmap = p.spend.total ? Math.round(((p.spend.total - p.spend.outside) / p.spend.total) * 100) : 0;
   box.replaceChildren(
     el('section', { class: 'card' },
-      el('div', { class: 'card-head' }, el('h2', {}, `${p.name} · ${t('burnup')}`), el('span', { class: 'spacer' }), st.zoom ? el('button', { class: 'btn', onclick: () => { st.zoom = null; update(); } }, t('resetZoom')) : null),
+      el('div', { class: 'card-head' }, el('h2', {}, `${p.name} · ${t('burnup')}`, info('remaining')), el('span', { class: 'spacer' }), st.zoom ? el('button', { class: 'btn', onclick: () => { st.zoom = null; update(); } }, t('resetZoom')) : null),
       el('p', { class: 'sub' }, [
         t('burnupSub'),
         p.growthRatio != null ? `${t('growth')} ${p.growthRatio.toFixed(2)}${p.growthRatio > 1 ? ' — ' + t('growthWarn') : ''}` : null,
         p.spend.total ? `${fmtUsd(p.spend.total)} · ${onRoadmap}% ${t('onRoadmap')}` : null,
         p.lastActive ? `${t('lastActive')} ${fmtTime(p.lastActive)}` : null,
-      ].filter(Boolean).join(' · ')),
+      ].filter(Boolean).join(' · '), info('growth'), info('onRoadmap')),
       el('div', { class: 'legend' }, el('span', {}, el('i', { class: 'key', style: 'background:var(--muted)' }), ' ', t('scope')), el('span', {}, el('i', { class: 'key', style: 'background:var(--s1)' }), ' ', t('done')), el('span', {}, el('i', { class: 'key', style: 'background:var(--s2)' }), ' ', t('remaining'))),
       el('div', { class: 'chart', id: 'burnChart' }),
       mixBar(p)),
@@ -527,7 +609,7 @@ function mixBar(p) {
     return s;
   };
   return el('div', { style: 'margin-top:14px' },
-    el('div', { class: 'sub', style: 'margin:0 0 4px' }, t('mixTitle').replace('{n}', m.windowDays) + ` · ${tot} ${t('pts')}`),
+    el('div', { class: 'sub', style: 'margin:0 0 4px' }, t('mixTitle').replace('{n}', m.windowDays) + ` · ${tot} ${t('pts')}`, info('mix')),
     el('div', { style: 'display:flex;gap:2px;height:10px;border-radius:4px;overflow:hidden' },
       m.planned ? seg(pp, 'var(--s1)', t('planned'), m.planned, null) : null,
       m.reactive ? seg(100 - pp, 'var(--s7)', t('reactive'), m.reactive, m.reactiveItems) : null),
@@ -621,12 +703,12 @@ function simulator(p) {
     result.replaceChildren(
       el('div', { class: 'label' }, `${t('toFinish')} ${pts} ${t('pts')}`),
       el('div', { class: 'value' }, fmtUsd(usd)),
-      el('div', { class: 'note' }, `${fmtUsd(p.usdPerPoint)}${t('perPt')} · ${p.rateBasis === 'project' ? t('rateProject') : t('rateAll')}`),
+      el('div', { class: 'note' }, `${fmtUsd(p.usdPerPoint)}${t('perPt')} · ${p.rateBasis === 'project' ? t('rateProject') : t('rateAll')}`, info('perPoint')),
       ...(cap ? [el('div', { class: 'note' }, `≈ ${(usd / cap).toFixed(1)} ${t('windows')}`)] : []));
   };
   recompute();
   return el('section', { class: 'card' },
-    el('h2', {}, t('simulate')), el('p', { class: 'sub' }, t('simulateSub')),
+    el('h2', {}, t('simulate'), info('toFinish')), el('p', { class: 'sub' }, t('simulateSub')),
     open.length ? el('div', { class: 'sim' },
       el('ul', {}, open.map((i) => el('li', {}, el('label', {}, el('input', { type: 'checkbox', checked: st.sim[i.key] !== false, onchange: (e) => { st.sim[i.key] = e.target.checked; recompute(); } }), `${i.title} · ${i.size}`)))),
       result) : el('div', { class: 'empty' }, '—'));
@@ -695,6 +777,7 @@ function update() {
   renderByProject(rows);
   renderCards();
   renderDetail();
+  renderGlossary();
   $('foot').textContent = `${t('prices')}: ${DATA.prices.source} (${DATA.prices.checked})${DATA.prices.unpriced.length ? ` · ${t('unpriced')}: ${DATA.prices.unpriced.join(', ')}` : ''} · scopeburn`;
 }
 let rt;
