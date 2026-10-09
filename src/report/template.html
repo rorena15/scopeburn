@@ -96,6 +96,20 @@ td.title { max-width: 420px; }
 .empty { color: var(--muted); padding: 24px 0; text-align: center; }
 .hidden { display: none !important; }
 .foot { color: var(--muted); font-size: 12px; margin-top: 24px; }
+.questions { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 440px), 1fr)); gap: 16px; margin-bottom: 16px; }
+.q { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+.q h2 { font-size: 16px; margin: 0 0 10px; }
+.q .big { font-size: 24px; font-weight: 650; letter-spacing: -0.01em; }
+.q .line { display: flex; gap: 8px; align-items: baseline; padding: 6px 0; border-top: 1px solid var(--grid); }
+.q .line:first-of-type { border-top: 0; }
+.q button.line { all: unset; display: flex; gap: 8px; align-items: baseline; padding: 6px 0; border-top: 1px solid var(--grid); cursor: pointer; width: 100%; box-sizing: border-box; }
+.q button.line:hover .pname, .q button.line:focus-visible .pname { text-decoration: underline; }
+.q .pname { font-weight: 600; min-width: 84px; }
+.q .say { color: var(--ink-2); flex: 1; }
+.q .say b { color: var(--ink); font-weight: 650; }
+.q .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; align-self: center; }
+.q .hint { color: var(--muted); font-size: 12px; margin-top: 8px; }
+.morebar { display: flex; justify-content: center; margin: 4px 0 16px; }
 .info { all: unset; display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; margin-left: 6px; border-radius: 50%; border: 1px solid var(--axis); color: var(--muted); font-size: 11px; font-weight: 600; cursor: help; vertical-align: 1px; }
 .info:hover, .info:focus-visible, .info[aria-expanded="true"] { color: var(--ink); border-color: var(--ink-2); }
 .tip .help { color: var(--ink-2); white-space: pre-line; line-height: 1.5; }
@@ -124,6 +138,11 @@ details.glossary h3 { grid-column: 1 / -1; font-size: 12px; color: var(--muted);
     <button class="btn" id="themeBtn"></button>
   </div>
 
+  <section class="questions" id="questions"></section>
+  <section id="detail"></section>
+  <div class="morebar"><button class="btn" id="moreBtn" aria-expanded="false"></button></div>
+
+  <div id="more" class="hidden">
   <section class="tiles" id="tiles"></section>
 
   <section class="card">
@@ -146,7 +165,7 @@ details.glossary h3 { grid-column: 1 / -1; font-size: 12px; color: var(--muted);
     <div class="projects" id="projectCards"></div>
   </section>
 
-  <section id="detail"></section>
+  </div>
 
   <section class="card"><details class="glossary" id="glossary"></details></section>
 
@@ -182,6 +201,11 @@ const T = {
     unpriced: 'No price for', total: 'Total', date: 'Date', other: 'Other', redacted: '',
     remaining: 'Remaining', mixTitle: 'Done in the last {n} days', planned: 'Planned ahead', reactive: 'Picked up within a day of being added',
     reactiveBadge: 'mostly unplanned work',
+    q1: 'Getting closer to done?', q2: 'Where did the spend go?', q3: 'What will it take to finish?', q4: 'How much limit is left?',
+    left: 'left', vsAgo: 'vs {n} days ago', down: 'down {n}', up: 'up {n}', same: 'no change', noRoadmap: 'No ROADMAP.md yet. Run `scopeburn init` in a project.',
+    unplannedShare: '{p}% of finished work was unplanned', clickDetail: 'Pick a project for its burn-up and items.', topProjects: 'top projects',
+    windowNow: 'this window', usedSoFar: 'spent so far', capUnknown: 'Cap not estimated yet. Record /usage with `scopeburn calibrate`.', more: 'Show details', less: 'Hide details',
+    finishLine: '≈ {usd} ({pts} pts × {rate}/pt)', noFinish: 'needs 5 finished items with spend', close: 'Close',
   },
   ko: {
     imported: '다른 곳에서 실행된 세션 포함', dailySpend: '일별 Claude 사용 금액', dailySpendSub: 'API 가격 환산 USD, 모델별로 쌓음',
@@ -203,6 +227,11 @@ const T = {
     unpriced: '단가 없음', total: '합계', date: '날짜', other: '기타', redacted: '',
     remaining: '남은 점수', mixTitle: '최근 {n}일 완료', planned: '미리 계획한 일', reactive: '추가되자마자 처리한 일',
     reactiveBadge: '대부분 계획 밖 작업',
+    q1: '끝나가나?', q2: '어디에 썼나?', q3: '끝내려면 얼마?', q4: '한도는 얼마나 남았나?',
+    left: '남음', vsAgo: '{n}일 전보다', down: '{n}점 줄었어요', up: '{n}점 늘었어요', same: '그대로예요', noRoadmap: '아직 ROADMAP.md가 없어요. 프로젝트에서 `scopeburn init`을 실행하세요.',
+    unplannedShare: '끝낸 일의 {p}%가 계획 밖', clickDetail: '프로젝트를 누르면 번업과 항목이 나와요.', topProjects: '많이 쓴 프로젝트',
+    windowNow: '지금 구간', usedSoFar: '지금까지 사용', capUnknown: '한도는 아직 추정 전이에요. `scopeburn calibrate`로 /usage 값을 넣어주세요.', more: '자세히 보기', less: '자세히 접기',
+    finishLine: '약 {usd} (남은 {pts}점 × 점당 {rate})', noFinish: '비용이 기록된 완료 항목 5개가 필요해요', close: '닫기',
   },
 };
 
@@ -274,7 +303,7 @@ function renderGlossary() {
 const attachInfo = (selector, key) => { const n = document.querySelector(selector); if (n && !n.querySelector('.info')) n.append(info(key)); };
 
 // ---------- state (URL hash) ----------
-const st = { period: 30, project: 'all', model: 'all', imported: true, sel: null, lang: null, zoom: null, q: '', sort: 'decided', dir: 1, hidden: [], open: [], sim: {}, dailyTable: false };
+const st = { more: false, period: 30, project: 'all', model: 'all', imported: true, sel: null, lang: null, zoom: null, q: '', sort: 'decided', dir: 1, hidden: [], open: [], sim: {}, dailyTable: false };
 function readHash() {
   const h = new URLSearchParams(location.hash.slice(1));
   if (h.has('p')) st.period = Number(h.get('p')) || 0;
@@ -283,11 +312,13 @@ function readHash() {
   if (h.has('imp')) st.imported = h.get('imp') !== '0';
   if (h.has('sel')) st.sel = h.get('sel');
   if (h.has('lang')) st.lang = h.get('lang');
+  st.more = h.get('more') === '1';
 }
 function writeHash() {
   const h = new URLSearchParams({ p: st.period, proj: st.project, model: st.model, imp: st.imported ? 1 : 0 });
   if (st.sel) h.set('sel', st.sel);
   if (st.lang) h.set('lang', st.lang);
+  if (st.more) h.set('more', '1');
   history.replaceState(null, '', '#' + h.toString());
 }
 readHash();
@@ -399,6 +430,7 @@ $('themeBtn').onclick = () => {
 };
 try { const th = localStorage.getItem('scopeburn-theme'); if (th) document.documentElement.dataset.theme = th; } catch {}
 $('dailyTableBtn').onclick = () => { st.dailyTable = !st.dailyTable; update(); };
+$('moreBtn').onclick = () => { st.more = !st.more; update(); };
 
 // ---------- tiles ----------
 function renderTiles(rows) {
@@ -432,6 +464,82 @@ function renderTiles(rows) {
       ].filter(Boolean).join(' · '))));
   }
   $('tiles').replaceChildren(...tiles);
+}
+
+// ---------- the four questions (home) ----------
+const fill = (s, vars) => s.replace(/\{(\w+)\}/g, (_, k) => (vars[k] ?? ''));
+function remainingTrend(p, days = 14) {
+  const pts = p.burnup;
+  if (!pts.length) return null;
+  const last = pts[pts.length - 1];
+  const cutoff = dayStr(new Date(Date.now() - days * dayMs));
+  const base = [...pts].reverse().find((q) => q.date <= cutoff) || pts[0];
+  const span = Math.max(1, Math.round((toDate(last.date) - toDate(base.date)) / dayMs));
+  return { now: last.scope - last.done, then: base.scope - base.done, span: Math.min(span, days) };
+}
+function selectProject(name) {
+  st.sel = name; st.zoom = null; st.sim = {}; update();
+  requestAnimationFrame(() => $('detail').scrollIntoView({ behavior: 'smooth', block: 'start' }));
+}
+function renderQuestions(rows) {
+  const qs = [];
+  // Q1 — getting closer?
+  const q1 = el('div', { class: 'q' }, el('h2', {}, t('q1'), info('remaining')));
+  if (!DATA.projects.length) q1.append(el('div', { class: 'say' }, t('noRoadmap')));
+  for (const p of DATA.projects) {
+    const tr = remainingTrend(p);
+    if (!tr) continue;
+    const d = tr.now - tr.then;
+    const color = d < 0 ? 'var(--good)' : d > 0 ? 'var(--serious)' : 'var(--warning)';
+    const change = d < 0 ? fill(t('down'), { n: -d }) : d > 0 ? fill(t('up'), { n: d }) : t('same');
+    const mx = p.doneMix, mxTot = mx.planned + mx.reactive;
+    const note = mxTot >= 4 && mx.reactive / mxTot > 0.5 ? ` · ${fill(t('unplannedShare'), { p: Math.round((mx.reactive / mxTot) * 100) })}` : '';
+    q1.append(el('button', { class: 'line', onclick: () => selectProject(p.name), 'aria-label': p.name },
+      el('i', { class: 'dot', style: `background:${color}` }),
+      el('span', { class: 'pname' }, p.name),
+      el('span', { class: 'say' }, el('b', {}, `${tr.now}${t('pts')} ${t('left')}`), ` · ${fill(t('vsAgo'), { n: tr.span })} ${change}${note}`)));
+  }
+  if (DATA.projects.length) q1.append(el('div', { class: 'hint' }, t('clickDetail')));
+  qs.push(q1);
+
+  // Q2 — where did the spend go?
+  const usd = rows.reduce((s, r) => s + r[4], 0);
+  const per = new Map();
+  for (const r of rows) per.set(r[1], (per.get(r[1]) || 0) + r[4]);
+  const top = [...per].sort((a, b) => b[1] - a[1]).slice(0, 3);
+  qs.push(el('div', { class: 'q' }, el('h2', {}, t('q2'), info('spend')),
+    el('div', { class: 'big' }, fmtUsd(usd)),
+    el('div', { class: 'hint', style: 'margin:2px 0 6px' }, `${t('period')[st.period]} · ${t('topProjects')}`),
+    ...top.map(([i, v]) => el('div', { class: 'line' }, el('span', { class: 'pname' }, DATA.dims.projects[i]), el('span', { class: 'say' }, el('b', {}, fmtUsd(v)), ` · ${usd ? Math.round((v / usd) * 100) : 0}%`)))));
+
+  // Q3 — cost to finish
+  const cap = DATA.limits.five && DATA.limits.five.cap ? DATA.limits.five.cap.median : null;
+  const q3 = el('div', { class: 'q' }, el('h2', {}, t('q3'), info('toFinish')));
+  for (const p of DATA.projects) {
+    const left = p.items.filter((i) => i.status === 'open').reduce((s, i) => s + i.points, 0);
+    if (!left) continue;
+    const say = p.usdPerPoint == null ? t('noFinish')
+      : fill(t('finishLine'), { usd: fmtUsd(left * p.usdPerPoint), pts: left, rate: fmtUsd(p.usdPerPoint) }) + (cap ? ` · ≈ ${((left * p.usdPerPoint) / cap).toFixed(1)} ${t('windows')}` : '');
+    q3.append(el('button', { class: 'line', onclick: () => selectProject(p.name) }, el('span', { class: 'pname' }, p.name), el('span', { class: 'say' }, say)));
+  }
+  if (!DATA.projects.length) q3.append(el('div', { class: 'say' }, t('noRoadmap')));
+  qs.push(q3);
+
+  // Q4 — limits
+  const q4 = el('div', { class: 'q' }, el('h2', {}, t('q4'), info('fiveHour')));
+  for (const [key, w] of [['fiveHour', DATA.limits.five], ['weekly', DATA.limits.week]]) {
+    if (!w) { q4.append(el('div', { class: 'line' }, el('span', { class: 'pname' }, t(key)), el('span', { class: 'say' }, t('noWindow')))); continue; }
+    const capW = w.cap ? w.cap.median : null;
+    const pct = w.reportedPct != null ? w.reportedPct : capW ? (w.spent / capW) * 100 : null;
+    const leftMs = Math.max(0, w.end - Date.now());
+    const reset = `${t('resetsIn')} ${Math.floor(leftMs / 3600000)}h ${Math.round((leftMs % 3600000) / 60000)}m`;
+    const color = pct == null ? 'var(--axis)' : pct >= 90 ? 'var(--critical)' : pct >= 75 ? 'var(--serious)' : pct >= 50 ? 'var(--warning)' : 'var(--good)';
+    q4.append(el('div', { class: 'line' }, el('i', { class: 'dot', style: `background:${color}` }), el('span', { class: 'pname' }, t(key)),
+      el('span', { class: 'say' }, pct != null ? el('b', {}, `${Math.round(pct)}%`) : el('b', {}, fmtUsd(w.spent)), ` ${pct != null ? '' : t('usedSoFar') + ' '}· ${reset}${w.hitsCapAt ? ` · ${t('hitsAt')} ${fmtTime(w.hitsCapAt).slice(11)}` : ''}`)));
+  }
+  if (!(DATA.limits.five && DATA.limits.five.cap)) q4.append(el('div', { class: 'hint' }, t('capUnknown')));
+  qs.push(q4);
+  $('questions').replaceChildren(...qs);
 }
 
 // ---------- daily stacked bars ----------
@@ -542,7 +650,6 @@ const roundedRight = (x, y, w, h, r) => { r = Math.min(r, w, h / 2); return `M${
 function renderCards() {
   const box = $('projectCards');
   if (!DATA.projects.length) { box.replaceChildren(el('div', { class: 'empty' }, 'ROADMAP.md — `scopeburn init`')); return; }
-  if (!st.sel || !DATA.projects.some((p) => p.name === st.sel)) st.sel = DATA.projects[0].name;
   box.replaceChildren(...DATA.projects.map((p) => {
     const pct = p.scope ? Math.round((p.done / p.scope) * 100) : 0;
     const badges = [];
@@ -582,7 +689,7 @@ function renderDetail() {
   const onRoadmap = p.spend.total ? Math.round(((p.spend.total - p.spend.outside) / p.spend.total) * 100) : 0;
   box.replaceChildren(
     el('section', { class: 'card' },
-      el('div', { class: 'card-head' }, el('h2', {}, `${p.name} · ${t('burnup')}`, info('remaining')), el('span', { class: 'spacer' }), st.zoom ? el('button', { class: 'btn', onclick: () => { st.zoom = null; update(); } }, t('resetZoom')) : null),
+      el('div', { class: 'card-head' }, el('h2', {}, `${p.name} · ${t('burnup')}`, info('remaining')), el('span', { class: 'spacer' }), st.zoom ? el('button', { class: 'btn', onclick: () => { st.zoom = null; update(); } }, t('resetZoom')) : null, el('button', { class: 'btn', onclick: () => { st.sel = null; st.zoom = null; update(); } }, t('close'))),
       el('p', { class: 'sub' }, [
         t('burnupSub'),
         p.growthRatio != null ? `${t('growth')} ${p.growthRatio.toFixed(2)}${p.growthRatio > 1 ? ' — ' + t('growthWarn') : ''}` : null,
@@ -772,6 +879,10 @@ function update() {
   writeHash();
   renderControls();
   const rows = filteredRows();
+  renderQuestions(rows);
+  $('more').classList.toggle('hidden', !st.more);
+  $('moreBtn').textContent = st.more ? `${t('less')} ▴` : `${t('more')} ▾`;
+  $('moreBtn').setAttribute('aria-expanded', String(st.more));
   renderTiles(rows);
   renderDaily(rows);
   renderByProject(rows);
