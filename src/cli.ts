@@ -10,6 +10,7 @@ import { dataDir } from './cache.ts';
 import { buildReportData } from './report-data.ts';
 import { openInBrowser, redact, serve, writeReport } from './report.ts';
 import { initRoadmap, installSkill, uninstallSkill } from './setup.ts';
+import { recordRun, selfUse } from './selfuse.ts';
 import { burnup, ROADMAP_FILE } from './history.ts';
 import { costOf, loadPrices, normalizeModel, type PriceTable } from './prices.ts';
 import { repoRootOfPath } from './repo.ts';
@@ -179,6 +180,7 @@ function cmdDoctor(roots: string[], res: Awaited<ReturnType<typeof loadRecords>>
         claudeCodeVersions: count((r) => r.version ?? '?'),
         prices: { source: prices.source, checked: prices.checked, unpricedModels: unpricedModels(inRange, prices) },
         calibrationSamples: readSamples().length,
+        selfUse: selfUse(),
       },
       null,
       2,
@@ -329,6 +331,8 @@ const HELP = `scopeburn: roadmap burn-up meets Claude Code spend (all local, no 
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
+  // The status line fires on every refresh; it isn't someone choosing to use scopeburn.
+  if (args.cmd !== 'statusline' && args.cmd !== 'help') recordRun(args.cmd);
 
   if (args.cmd === 'statusline') {
     const sub = args.positional[0];
