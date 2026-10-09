@@ -281,6 +281,12 @@ function cmdRoadmap(args: Args, records: UsageRecord[], prices: PriceTable, cfg:
       console.log(`  last 14 days: scope +${sum.scopeAdded14d}, done +${sum.done14d} → growth ${sum.growthRatio.toFixed(2)}${sum.growthRatio > 1 ? '  ⚠ scope is growing faster than work gets done' : ''}`);
     else if (sum.scopeAdded14d > 0) console.log(`  last 14 days: scope +${sum.scopeAdded14d}, nothing finished`);
     if (sum.medianLeadDays != null) console.log(`  median decided → done: ${days(sum.medianLeadDays)}`);
+    const mix = sum.doneMix;
+    if (mix.planned + mix.reactive > 0) {
+      const share = Math.round((mix.reactive / (mix.planned + mix.reactive)) * 100);
+      console.log(`  done in last ${mix.windowDays} days: ${mix.planned + mix.reactive} pts — ${100 - share}% planned ahead, ${share}% picked up within a day of being added`);
+    }
+    console.log(`  remaining: ${n.scope - n.done} pts`);
     const idle = last ? Math.floor((Date.now() - last) / 86_400_000) : null;
     for (const t of sum.inProgress)
       console.log(`  in progress: ${itemLabel(t.item.key, t.item.title)} — since ${t.start}${idle != null && idle >= 7 ? `, no Claude activity in this project for ${days(idle)}` : ''}`);

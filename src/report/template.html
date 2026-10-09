@@ -169,6 +169,8 @@ const T = {
     viaCommits: 'via {ID} commits', parent: 'part of', start: 'started', paused: 'paused', lastActive: 'last Claude activity',
     days: 'd', ago: 'ago', today: 'today', none: 'Nothing in this period.', generated: 'Generated', prices: 'Prices', live: 'live',
     unpriced: 'No price for', total: 'Total', date: 'Date', other: 'Other', redacted: '',
+    remaining: 'Remaining', mixTitle: 'Done in the last {n} days', planned: 'Planned ahead', reactive: 'Picked up within a day of being added',
+    reactiveBadge: 'mostly unplanned work',
   },
   ko: {
     imported: '다른 곳에서 실행된 세션 포함', dailySpend: '일별 Claude 사용 금액', dailySpendSub: 'API 가격 환산 USD, 모델별로 쌓음',
@@ -188,6 +190,8 @@ const T = {
     viaCommits: '{ID} 커밋으로', parent: '상위 항목', start: '시작', paused: '멈춤', lastActive: '마지막 Claude 활동',
     days: '일', ago: '전', today: '오늘', none: '이 기간에는 기록이 없어요.', generated: '생성', prices: '단가', live: '실시간',
     unpriced: '단가 없음', total: '합계', date: '날짜', other: '기타', redacted: '',
+    remaining: '남은 점수', mixTitle: '최근 {n}일 완료', planned: '미리 계획한 일', reactive: '추가되자마자 처리한 일',
+    reactiveBadge: '대부분 계획 밖 작업',
   },
 };
 
@@ -463,6 +467,8 @@ function renderCards() {
     if (p.growthRatio != null && p.growthRatio > 1) badges.push(el('span', { class: 'status' }, el('i', { style: 'background:var(--serious)' }), `${t('growth')} ${p.growthRatio.toFixed(1)}`));
     const waiting = p.items.filter((i) => i.status === 'open' && !i.start && (i.ageDays || 0) >= 14).length;
     if (waiting) badges.push(el('span', { class: 'status' }, el('i', { style: 'background:var(--warning)' }), `${t('waitingOld')} 14${t('days')}+ ×${waiting}`));
+    const mx = p.doneMix, mxTot = mx.planned + mx.reactive;
+    if (mxTot >= 4 && mx.reactive / mxTot > 0.5) badges.push(el('span', { class: 'status' }, el('i', { style: 'background:var(--s7)' }), `${t('reactiveBadge')} ${Math.round((mx.reactive / mxTot) * 100)}%`));
     const paused = p.items.filter((i) => i.status === 'open' && i.paused).length;
     if (paused) badges.push(el('span', { class: 'status' }, el('i', { style: 'background:var(--muted)' }), `${t('statusPaused')} ×${paused}`));
     return el('button', { class: 'pcard', 'aria-pressed': String(st.sel === p.name), onclick: () => { st.sel = p.name; st.zoom = null; st.sim = {}; update(); document.getElementById('detail').scrollIntoView({ behavior: 'smooth', block: 'start' }); } },
@@ -501,11 +507,33 @@ function renderDetail() {
         p.spend.total ? `${fmtUsd(p.spend.total)} · ${onRoadmap}% ${t('onRoadmap')}` : null,
         p.lastActive ? `${t('lastActive')} ${fmtTime(p.lastActive)}` : null,
       ].filter(Boolean).join(' · ')),
-      el('div', { class: 'legend' }, el('span', {}, el('i', { class: 'key', style: 'background:var(--muted)' }), ' ', t('scope')), el('span', {}, el('i', { class: 'key', style: 'background:var(--s1)' }), ' ', t('done'))),
-      el('div', { class: 'chart', id: 'burnChart' })),
+      el('div', { class: 'legend' }, el('span', {}, el('i', { class: 'key', style: 'background:var(--muted)' }), ' ', t('scope')), el('span', {}, el('i', { class: 'key', style: 'background:var(--s1)' }), ' ', t('done')), el('span', {}, el('i', { class: 'key', style: 'background:var(--s2)' }), ' ', t('remaining'))),
+      el('div', { class: 'chart', id: 'burnChart' }),
+      mixBar(p)),
     simulator(p),
     itemsTable(p));
   drawBurnup(p);
+}
+
+function mixBar(p) {
+  const m = p.doneMix, tot = m.planned + m.reactive;
+  if (!tot) return null;
+  const pp = Math.round((m.planned / tot) * 100);
+  const titleOf = new Map(p.items.map((i) => [i.key, i.title]));
+  const seg = (w, color, label, val, list) => {
+    const s = el('span', { tabindex: 0, style: `display:block;height:100%;width:${w}%;background:${color};${w > 0 && w < 100 ? '' : ''}` });
+    const show = (ev) => showTip(ev, () => [el('div', { class: 't' }, label), tipRow(null, t('pts'), `${val} (${Math.round((val / tot) * 100)}%)`), list && list.length ? el('ul', {}, list.slice(0, 8).map((k) => el('li', {}, titleOf.get(k) || k))) : null].filter(Boolean));
+    s.addEventListener('pointermove', show); s.addEventListener('pointerleave', hideTip);
+    return s;
+  };
+  return el('div', { style: 'margin-top:14px' },
+    el('div', { class: 'sub', style: 'margin:0 0 4px' }, t('mixTitle').replace('{n}', m.windowDays) + ` · ${tot} ${t('pts')}`),
+    el('div', { style: 'display:flex;gap:2px;height:10px;border-radius:4px;overflow:hidden' },
+      m.planned ? seg(pp, 'var(--s1)', t('planned'), m.planned, null) : null,
+      m.reactive ? seg(100 - pp, 'var(--s7)', t('reactive'), m.reactive, m.reactiveItems) : null),
+    el('div', { class: 'legend', style: 'margin-top:6px' },
+      el('span', {}, el('i', { class: 'key', style: 'background:var(--s1)' }), ` ${t('planned')} ${m.planned} ${t('pts')} (${pp}%)`),
+      el('span', {}, el('i', { class: 'key', style: 'background:var(--s7)' }), ` ${t('reactive')} ${m.reactive} ${t('pts')} (${100 - pp}%)`)));
 }
 
 function drawBurnup(p) {
@@ -534,19 +562,24 @@ function drawBurnup(p) {
   const stepPath = (k) => pts.map((q, i) => (i ? `H${X(xs[i])}V${Y(q[k])}` : `M${X(xs[i])},${Y(q[k])}`)).join('');
   svg.append(sv('path', { d: stepPath('scope'), fill: 'none', stroke: 'var(--muted)', 'stroke-width': 2, 'stroke-linejoin': 'round' }));
   svg.append(sv('path', { d: stepPath('done'), fill: 'none', stroke: 'var(--s1)', 'stroke-width': 2, 'stroke-linejoin': 'round' }));
+  svg.append(sv('path', { d: pts.map((q, i) => (i ? `H${X(xs[i])}V${Y(q.scope - q.done)}` : `M${X(xs[i])},${Y(q.scope - q.done)}`)).join(''), fill: 'none', stroke: 'var(--s2)', 'stroke-width': 2, 'stroke-linejoin': 'round' }));
   // cut markers on the scope line
   pts.forEach((q, i) => { if (q.cutItems.length) svg.append(sv('path', { d: `M${X(xs[i]) - 4},${Y(q.scope) - 4}l8,8m0,-8l-8,8`, stroke: 'var(--ink-2)', 'stroke-width': 2, 'stroke-linecap': 'round' })); });
   // direct labels at the end
   const last = pts[pts.length - 1];
-  svg.append(sv('text', { x: W - m.r + 6, y: Y(last.scope) + 4, style: 'fill:var(--ink-2)' }, `${t('scope')} ${last.scope}`));
-  svg.append(sv('text', { x: W - m.r + 6, y: Math.min(Y(last.done) + 4, Y(last.scope) + 18 > Y(last.done) + 4 ? Y(last.scope) + 18 : Y(last.done) + 4), style: 'fill:var(--ink-2)' }, `${t('done')} ${last.done}`));
+  // end labels, nudged apart so they never overlap
+  const labels = [[last.scope, `${t('scope')} ${last.scope}`], [last.done, `${t('done')} ${last.done}`], [last.scope - last.done, `${t('remaining')} ${last.scope - last.done}`]]
+    .map(([v, txt]) => ({ y: Y(v) + 4, txt })).sort((a, b) => a.y - b.y);
+  for (let i = 1; i < labels.length; i++) if (labels[i].y - labels[i - 1].y < 13) labels[i].y = labels[i - 1].y + 13;
+  for (const l of labels) svg.append(sv('text', { x: W - m.r + 6, y: l.y, style: 'fill:var(--ink-2)' }, l.txt));
   // crosshair + tooltip + brush zoom
   const cross = sv('line', { y1: m.t, y2: m.t + ih, stroke: 'var(--axis)', visibility: 'hidden' });
   const dotS = sv('circle', { r: 4, fill: 'var(--muted)', stroke: 'var(--surface)', 'stroke-width': 2, visibility: 'hidden' });
   const dotD = sv('circle', { r: 4, fill: 'var(--s1)', stroke: 'var(--surface)', 'stroke-width': 2, visibility: 'hidden' });
+  const dotR = sv('circle', { r: 4, fill: 'var(--s2)', stroke: 'var(--surface)', 'stroke-width': 2, visibility: 'hidden' });
   const brush = sv('rect', { y: m.t, height: ih, fill: 'var(--brush)', visibility: 'hidden' });
   const hit = sv('rect', { x: m.l, y: m.t, width: iw, height: ih, fill: 'transparent', style: 'cursor:crosshair;touch-action:none' });
-  svg.append(brush, cross, dotS, dotD, hit);
+  svg.append(brush, cross, dotS, dotD, dotR, hit);
   const titleOf = new Map(p.items.map((i) => [i.key, i.title]));
   const nearest = (cx) => { let bi = 0, bd = Infinity; xs.forEach((v, i) => { const d = Math.abs(X(v) - cx); if (d < bd) { bd = d; bi = i; } }); return bi; };
   const local = (ev) => { const r = svg.getBoundingClientRect(); return ((ev.clientX - r.left) / r.width) * W; };
@@ -556,12 +589,12 @@ function drawBurnup(p) {
     const cx = local(ev);
     if (drag != null) { brush.setAttribute('x', Math.min(drag, cx)); brush.setAttribute('width', Math.abs(cx - drag)); brush.setAttribute('visibility', 'visible'); }
     const i = nearest(cx), q = pts[i];
-    for (const [n, v] of [[cross, null], [dotS, q.scope], [dotD, q.done]]) {
+    for (const [n, v] of [[cross, null], [dotS, q.scope], [dotD, q.done], [dotR, q.scope - q.done]]) {
       n.setAttribute('visibility', 'visible');
       if (v == null) { n.setAttribute('x1', X(xs[i])); n.setAttribute('x2', X(xs[i])); } else { n.setAttribute('cx', X(xs[i])); n.setAttribute('cy', Y(v)); }
     }
     const list = (label, keys) => keys.length ? [el('div', { class: 't', style: 'margin-top:6px' }, `${label} (${keys.length})`), el('ul', {}, keys.slice(0, 6).map((k) => el('li', {}, titleOf.get(k) || k)), keys.length > 6 ? el('li', {}, '…') : null)] : [];
-    showTip(ev, () => [el('div', { class: 't' }, q.date), tipRow('var(--s1)', t('done'), `${q.done} ${t('pts')}`), tipRow('var(--muted)', t('scope'), `${q.scope} ${t('pts')}`),
+    showTip(ev, () => [el('div', { class: 't' }, q.date), tipRow('var(--s1)', t('done'), `${q.done} ${t('pts')}`), tipRow('var(--muted)', t('scope'), `${q.scope} ${t('pts')}`), tipRow('var(--s2)', t('remaining'), `${q.scope - q.done} ${t('pts')}`),
       ...list(t('added'), q.added), ...list(t('completed'), q.completed), ...list(t('statusCut'), q.cutItems)]);
   });
   hit.addEventListener('pointerup', (ev) => {
@@ -572,7 +605,7 @@ function drawBurnup(p) {
     }
     drag = null; brush.setAttribute('visibility', 'hidden');
   });
-  hit.addEventListener('pointerleave', () => { if (drag == null) { hideTip(); for (const n of [cross, dotS, dotD]) n.setAttribute('visibility', 'hidden'); } });
+  hit.addEventListener('pointerleave', () => { if (drag == null) { hideTip(); for (const n of [cross, dotS, dotD, dotR]) n.setAttribute('visibility', 'hidden'); } });
   hit.addEventListener('dblclick', () => { st.zoom = null; update(); });
   box.replaceChildren(svg);
 }

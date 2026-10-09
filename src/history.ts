@@ -191,6 +191,36 @@ export function timelines(snaps: Snapshot[], today = day(Date.now())): ItemTimel
     });
 }
 
+/** Work picked up within this many days of being added counts as reactive (it wasn't planned ahead). */
+export const REACTIVE_DAYS = 1;
+export const MIX_WINDOW_DAYS = 30;
+
+export interface DoneMix {
+  windowDays: number;
+  /** points finished in the window that were on the roadmap more than REACTIVE_DAYS before work began */
+  planned: number;
+  /** points finished in the window that were added and taken up almost at once */
+  reactive: number;
+  reactiveItems: string[];
+}
+
+/** Split recently finished work into planned-ahead vs picked-up-at-once, by points. */
+export function doneMix(tl: ItemTimeline[], today: string, windowDays = MIX_WINDOW_DAYS): DoneMix {
+  const from = day(Date.parse(today) - (windowDays - 1) * 86_400_000);
+  const mix: DoneMix = { windowDays, planned: 0, reactive: 0, reactiveItems: [] };
+  for (const t of tl) {
+    if (!t.done || t.done < from || !t.decided) continue;
+    // First seen already finished and no @decided: when it was planned is unknown, so it says nothing either way.
+    if (!t.item.decided && t.firstSeen === t.done) continue;
+    const begin = t.start ?? t.done;
+    if (daysBetween(t.decided, begin) <= REACTIVE_DAYS) {
+      mix.reactive += t.item.points;
+      mix.reactiveItems.push(t.item.key);
+    } else mix.planned += t.item.points;
+  }
+  return mix;
+}
+
 export interface ProgressSummary {
   stage: Stage | null;
   now: Totals;
@@ -199,6 +229,7 @@ export interface ProgressSummary {
   scopeAdded14d: number;
   done14d: number;
   medianLeadDays: number | null;
+  doneMix: DoneMix;
   /** open, decided, not started, oldest first */
   waiting: ItemTimeline[];
   /** started but not finished */
@@ -226,6 +257,7 @@ export function summarize(snaps: Snapshot[], today = day(Date.now())): ProgressS
     scopeAdded14d,
     done14d,
     medianLeadDays: leads.length ? leads[leads.length >> 1] : null,
+    doneMix: doneMix(tl, today),
     waiting: tl.filter((t) => t.item.status === 'open' && !t.start).sort((a, b) => (b.ageDays ?? 0) - (a.ageDays ?? 0)),
     inProgress: tl.filter((t) => t.item.status === 'open' && t.start && !t.item.paused),
     paused: tl.filter((t) => t.item.status === 'open' && t.item.paused),

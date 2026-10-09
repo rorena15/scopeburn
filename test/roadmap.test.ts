@@ -82,3 +82,16 @@ test('checkboxes inside HTML comments are format notes, not items', () => {
   const r = parseRoadmap('<!--\n  - [ ] open   - [x] done\n-->\n<!-- - [ ] {X} one-line note -->\n- [ ] {A} real');
   assert.deepEqual(r.items.map((i) => i.key), ['A']);
 });
+
+test('done mix separates planned-ahead from picked-up-at-once work, and skips unknowns', async () => {
+  const { doneMix } = await import('../src/history.ts');
+  const r = parseRoadmap(
+    '- [x] {P} planned ~L @decided(2026-09-20) @start(2026-09-25) @done(2026-09-28)\n' +
+      '- [x] {R} reactive ~M @decided(2026-09-27) @done(2026-09-28)\n' +
+      '- [x] {U} unknown ~XL\n' +
+      '- [x] {O} too old @decided(2026-08-01) @done(2026-08-02)',
+  );
+  const tl = timelines([{ ts: Date.parse('2026-10-01T12:00:00'), source: 'git', commit: null, roadmap: r }], '2026-10-01');
+  const m = doneMix(tl, '2026-10-01');
+  assert.deepEqual([m.planned, m.reactive, m.reactiveItems], [4, 2, ['R']]);
+});

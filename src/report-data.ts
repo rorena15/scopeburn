@@ -4,7 +4,7 @@ import * as path from 'node:path';
 import { attribute, UNATTRIBUTED } from './attribute.ts';
 import { analyzeProjects, discoverRoadmapRoots } from './analyze.ts';
 import type { Config } from './config.ts';
-import { burnup, type BurnPoint } from './history.ts';
+import { burnup, type BurnPoint, type DoneMix } from './history.ts';
 import { buildCostIndex, resolveSamples, windowStatus, type WindowStatus } from './limits.ts';
 import type { UsageRecord } from './logs.ts';
 import { costOf, normalizeModel, type PriceTable } from './prices.ts';
@@ -42,6 +42,7 @@ export interface ReportProject {
   scopeAdded14d: number;
   done14d: number;
   medianLeadDays: number | null;
+  doneMix: DoneMix;
   burnup: BurnPoint[];
   items: ReportItem[];
   spend: { total: number; outside: number; taggedCommits: number };
@@ -123,6 +124,7 @@ export function buildReportData(records: UsageRecord[], prices: PriceTable, cfg:
     scopeAdded14d: p.sum.scopeAdded14d,
     done14d: p.sum.done14d,
     medianLeadDays: p.sum.medianLeadDays,
+    doneMix: p.sum.doneMix,
     burnup: burnup(p.snaps),
     items: p.tl.map((t) => {
       const c = p.costs.byItem.get(t.item.key);
