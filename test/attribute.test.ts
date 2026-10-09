@@ -3,7 +3,7 @@ import { test } from 'node:test';
 import { attribute, UNATTRIBUTED } from '../src/attribute.ts';
 import type { UsageRecord } from '../src/logs.ts';
 
-const usage = { input: 1, output: 1, cacheRead: 0, cacheWrite: 0, cacheWrite5m: 0, cacheWrite1h: 0, webSearch: 0 };
+const usage = { input: 1, output: 1, cacheRead: 0, cacheWrite: 0, cacheWrite5m: 0, cacheWrite1h: 0, webSearch: 0, fast: false, geoUS: false };
 let n = 0;
 const rec = (o: Partial<UsageRecord>): UsageRecord => ({
   key: `k${n++}`, ts: 0, model: 'm', session: 's1', agent: null, turn: 's1#1', repos: {}, cwdRepo: null, version: null, entrypoint: 'cli', usage, ...o,

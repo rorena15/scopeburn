@@ -17,6 +17,10 @@ export interface Usage {
   cacheWrite5m: number;
   cacheWrite1h: number;
   webSearch: number;
+  /** fast mode (premium-priced) response */
+  fast: boolean;
+  /** US-only inference (inference_geo: "us"), priced with a multiplier */
+  geoUS: boolean;
 }
 
 export interface UsageRecord {
@@ -86,6 +90,8 @@ function readUsage(u: any): Usage | null {
     cacheWrite5m: num(u.cache_creation?.ephemeral_5m_input_tokens),
     cacheWrite1h: num(u.cache_creation?.ephemeral_1h_input_tokens),
     webSearch: num(u.server_tool_use?.web_search_requests),
+    fast: u.speed === 'fast',
+    geoUS: u.inference_geo === 'us',
   };
 }
 

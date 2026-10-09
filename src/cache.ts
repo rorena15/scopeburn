@@ -5,7 +5,7 @@ import * as path from 'node:path';
 import { fileStamp, parseFile, type FileParse, type UsageRecord } from './logs.ts';
 
 // Bump whenever parsing or attribution rules change, so stale cached records are re-read.
-const CACHE_VERSION = 4;
+const CACHE_VERSION = 5;
 
 interface CacheEntry extends FileParse {
   size: number;
