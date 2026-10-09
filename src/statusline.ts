@@ -138,7 +138,7 @@ function settingsPath(): string {
 
 const backupFile = () => path.join(dataDir(), 'statusline-backup.json');
 
-function writeJsonPreservingIndent(file: string, original: string, obj: unknown) {
+export function writeJsonPreservingIndent(file: string, original: string, obj: unknown) {
   const indent = /\n([ \t]+)"/.exec(original)?.[1] ?? '  ';
   const tmp = `${file}.scopeburn.tmp`;
   writeFileSync(tmp, `${JSON.stringify(obj, null, indent)}\n`);

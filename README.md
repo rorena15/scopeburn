@@ -16,7 +16,7 @@ It makes **no network requests** and sends no telemetry.
 
 ```bash
 npx scopeburn usage              # spend per project, last 30 days
-npx scopeburn init               # write a ROADMAP.md template in this repo
+npx scopeburn init               # draft a ROADMAP.md from this repo's git history
 npx scopeburn roadmap            # burn-up, waiting items, cost per item, cost to finish
 npx scopeburn report --open      # interactive dashboard (one HTML file)
 ```
@@ -59,6 +59,7 @@ stage: beta
 | `statusline install` | Record `/usage` numbers automatically (terminal Claude Code, Pro/Max). Wraps any status line you already have. |
 | `config` | Billing (`subscription` or `api`), plan, monthly fee, display currency |
 | `doctor` | Parser and attribution diagnostics, safe to paste into an issue |
+| `hook install` | When you plan, design or decide something, Claude is reminded to record it in `ROADMAP.md` (a UserPromptSubmit hook; no LLM, just a keyword check) |
 
 ## How it attributes usage
 

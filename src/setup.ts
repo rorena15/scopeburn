@@ -3,6 +3,7 @@ import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node
 import * as os from 'node:os';
 import * as path from 'node:path';
 import skillTemplate from '../skill/SKILL.md';
+import { docTodos, draftRoadmap, gitCommits } from './draft.ts';
 import { ROADMAP_FILE } from './history.ts';
 import { repoRootOfPath } from './repo.ts';
 
@@ -24,14 +25,29 @@ stage: prototype
 `;
 }
 
-export function initRoadmap(dir: string): string {
+export interface InitOptions {
+  /** template only, no git draft */
+  blank?: boolean;
+  /** print the draft instead of writing it */
+  print?: boolean;
+  days?: number;
+}
+
+export function initRoadmap(dir: string, o: InitOptions = {}): string {
   const root = repoRootOfPath(path.resolve(dir)) ?? path.resolve(dir);
   const file = path.join(root, ROADMAP_FILE);
-  if (existsSync(file)) return `${file} already exists; left unchanged`;
+  if (existsSync(file) && !o.print) return `${file} already exists; left unchanged`;
   const d = new Date();
   const today = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  writeFileSync(file, roadmapTemplate(path.basename(root), today));
-  return `wrote ${file}`;
+  const commits = o.blank ? [] : gitCommits(root, o.days ?? 90);
+  const todos = o.blank ? [] : docTodos(root);
+  const md = commits.length || todos.length ? draftRoadmap(commits, todos, { name: path.basename(root), today }) : roadmapTemplate(path.basename(root), today);
+  if (o.print) return md;
+  writeFileSync(file, md);
+  const items = (md.match(/^\s*- \[[ x-]\]/gm) ?? []).length;
+  return commits.length || todos.length
+    ? `wrote ${file}: ${items} items drafted from ${commits.length} commits and ${todos.length} doc to-dos. Review the names, sizes and grouping, then commit.`
+    : `wrote ${file} (template; no recent commits to draft from)`;
 }
 
 function skillDir(): string {

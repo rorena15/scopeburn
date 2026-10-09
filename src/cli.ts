@@ -11,6 +11,7 @@ import { buildReportData } from './report-data.ts';
 import { openInBrowser, redact, serve, writeReport } from './report.ts';
 import { initRoadmap, installSkill, uninstallSkill } from './setup.ts';
 import { recordRun, selfUse } from './selfuse.ts';
+import { installPromptHook, promptHookMain, uninstallPromptHook } from './hook.ts';
 import { burnup, ROADMAP_FILE } from './history.ts';
 import { costOf, loadPrices, normalizeModel, type PriceTable } from './prices.ts';
 import { repoRootOfPath } from './repo.ts';
@@ -51,13 +52,14 @@ function parseArgs(argv: string[]): Args {
     if (!f.startsWith('--')) a.positional.push(f);
     else if (f === '--since') a.since = parseDate(val());
     else if (f === '--until') a.until = parseDate(val()) + 86_400_000;
-    else if (f === '--days') days = Number(val());
+    else if (f === '--days') a.opts.days = String((days = Number(val())));
     else if (f === '--by') a.by = val() as Args['by'];
     else if (f === '--json') a.json = true;
     else if (f === '--no-cache') a.noCache = true;
     else if (f === '--local-only') a.localOnly = true;
     else if (f === '--items') a.opts.items = '1';
     else if (f === '--open') a.opts.open = '1';
+    else if (f === '--blank' || f === '--print') a.opts[f.slice(2)] = '1';
     else if (f === '--redact') a.opts.redact = '1';
     else if (f === '--out' || f === '--port') a.opts[f.slice(2)] = val();
     else if (['--billing', '--plan', '--fee', '--currency', '--rate'].includes(f)) a.opts[f.slice(2)] = val();
@@ -328,17 +330,25 @@ const HELP = `scopeburn: roadmap burn-up meets Claude Code spend (all local, no 
   limits     [--local-only] [--json]             5-hour / weekly windows, cap estimate, time to cap
   report     [--out file] [--open] [--redact]    interactive dashboard (one HTML file)
   serve      [--port 4719] [--open] [--redact]   live dashboard on localhost
-  init       [repo]                              write a ROADMAP.md template
+  init       [repo] [--days 90] [--print] [--blank]  draft a ROADMAP.md from git history and doc to-dos
   calibrate  <5h%> [weekly%]                     record what /usage shows
   config     [--billing subscription|api] [--plan P] [--fee USD] [--currency C --rate R]
   statusline install|uninstall                   record /usage numbers automatically (terminal Claude Code)
   skill      install|uninstall                   install the /scopeburn Claude Code skill
+  hook       install|uninstall                   remind Claude to update ROADMAP.md when you plan, design or decide
   doctor                                         parser and attribution diagnostics`;
 
 async function main() {
   const args = parseArgs(process.argv.slice(2));
-  // The status line fires on every refresh; it isn't someone choosing to use scopeburn.
-  if (args.cmd !== 'statusline' && args.cmd !== 'help') recordRun(args.cmd);
+  // The status line and the prompt hook fire on their own; they aren't someone choosing to use scopeburn.
+  if (args.cmd !== 'statusline' && args.cmd !== 'hook' && args.cmd !== 'help') recordRun(args.cmd);
+  if (args.cmd === 'hook') {
+    const sub = args.positional[0];
+    if (sub === 'prompt') return promptHookMain();
+    if (sub === 'install') return console.log(`scopeburn prompt hook ${installPromptHook()}`);
+    if (sub === 'uninstall') return console.log(uninstallPromptHook());
+    throw new Error('usage: scopeburn hook install|uninstall');
+  }
 
   if (args.cmd === 'statusline') {
     const sub = args.positional[0];
@@ -347,7 +357,7 @@ async function main() {
     return statuslineMain();
   }
 
-  if (args.cmd === 'init') return console.log(initRoadmap(args.positional[0] ?? '.'));
+  if (args.cmd === 'init') return console.log(initRoadmap(args.positional[0] ?? '.', { blank: !!args.opts.blank, print: !!args.opts.print, days: args.opts.days ? Number(args.opts.days) : undefined }));
   if (args.cmd === 'skill') {
     const sub = args.positional[0];
     if (sub === 'install') return console.log(installSkill());

@@ -47,10 +47,12 @@ When the repo you're working in has a `ROADMAP.md`, keep it current as part of t
 - Put the item's `{ID}` in the commit message when a commit is mainly about one item. This makes the cost attribution exact. It's optional.
 - Use today's date in the user's local time zone.
 
+When the `[scopeburn] Roadmaps here: …` note appears with a user message, the prompt hook matched planning or decision words. Act on it only if work was actually decided, approved, designed, reprioritized or dropped. Then update the right ROADMAP.md and say in one line what changed.
+
 ## `/scopeburn init`: writing a first ROADMAP.md
 
-1. Run `npx -y scopeburn@latest init <repo>`. It writes a template, and never overwrites an existing file.
-2. Fill it from what the repo already says. Use the status or plan docs (for example `docs/*`, `TODO*`, `CHANGELOG*`) and `git log --since=90.days --format="%cs %s"`.
+1. Run `npx -y scopeburn@latest init <repo>`. It drafts a ROADMAP.md from git history (commits grouped by topic, sized by commit count, dated) and from unchecked to-dos in the docs. It never overwrites an existing file; `--print` previews it.
+2. Improve the draft from what the repo already says. Use the status or plan docs (for example `docs/*`, `TODO*`, `CHANGELOG*`) and `git log --since=90.days --format="%cs %s"`.
    - Group items by milestone.
    - Use real dates from git for `@decided`/`@done`. They rebuild the burn-up history, so with good dates the chart starts on day one.
    - Keep each item one line, in the user's language.
