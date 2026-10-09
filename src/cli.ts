@@ -5,7 +5,8 @@ import { loadRecords } from './cache.ts';
 import { loadConfig, saveConfig, type Config } from './config.ts';
 import { buildCostIndex, resolveSamples, windowStatus, type WindowStatus } from './limits.ts';
 import { defaultLogRoots, listLogFiles, type Usage, type UsageRecord } from './logs.ts';
-import { burnup, ROADMAP_FILE, snapshots, summarize } from './history.ts';
+import { burnup, ROADMAP_FILE, snapshots, summarize, timelines } from './history.ts';
+import { finishedRates, itemCosts, project } from './itemcost.ts';
 import { costOf, loadPrices, normalizeModel, type PriceTable } from './prices.ts';
 import { repoRootOfPath } from './repo.ts';
 import { appendSample, installStatusline, readSamples, statuslineMain, uninstallStatusline } from './statusline.ts';
@@ -49,6 +50,7 @@ function parseArgs(argv: string[]): Args {
     else if (f === '--json') a.json = true;
     else if (f === '--no-cache') a.noCache = true;
     else if (f === '--local-only') a.localOnly = true;
+    else if (f === '--items') a.opts.items = '1';
     else if (['--billing', '--plan', '--fee', '--currency', '--rate'].includes(f)) a.opts[f.slice(2)] = val();
     else throw new Error(`unknown option: ${f}`);
   }
@@ -235,10 +237,10 @@ function itemLabel(key: string, title: string): string {
   return key.startsWith('~') ? short : `{${key}} ${short}`;
 }
 
-function cmdRoadmap(args: Args, records: UsageRecord[]) {
+function cmdRoadmap(args: Args, records: UsageRecord[], prices: PriceTable, cfg: Config) {
   // Projects: the paths given, else every project seen in the logs (plus cwd) that has a ROADMAP.md.
   let roots: string[];
-  if (args.positional.length) roots = args.positional.map((p) => path.resolve(p));
+  if (args.positional.length) roots = args.positional.map((p) => repoRootOfPath(path.resolve(p)) ?? path.resolve(p));
   else {
     const seen = new Set<string>();
     for (const r of records) {
@@ -253,22 +255,40 @@ function cmdRoadmap(args: Args, records: UsageRecord[]) {
     console.log(`No ${ROADMAP_FILE} found. Create one in a project (see docs), or pass a path: scopeburn roadmap <repo>`);
     return;
   }
-  // Last activity per project, from the usage logs.
+  const usage = attribute(records);
   const lastActive = new Map<string, number>();
-  for (const it of attribute(records)) for (const s of it.shares) lastActive.set(s.repo, Math.max(lastActive.get(s.repo) ?? 0, it.rec.ts));
+  for (const it of usage) for (const s of it.shares) lastActive.set(s.repo, Math.max(lastActive.get(s.repo) ?? 0, it.rec.ts));
 
-  const out: Record<string, unknown> = {};
-  for (const root of roots) {
+  // First pass: per-project analysis, and per-point rates pooled across projects as a fallback.
+  const projects = roots.flatMap((root) => {
     const snaps = snapshots(root);
     const sum = summarize(snaps);
-    if (!sum) {
-      console.log(`${path.basename(root)}: no ${ROADMAP_FILE}`);
-      continue;
-    }
+    if (!sum) return [];
+    const tl = timelines(snaps);
+    const costs = itemCosts(root, usage, tl, prices);
+    return [{ root, snaps, sum, tl, costs }];
+  });
+  const pooled = projects.flatMap((p) => finishedRates(p.tl, p.costs)).sort((a, b) => a - b);
+  const fallback = pooled.length >= 5 ? pooled[pooled.length >> 1] : null;
+  const samples = (() => {
+    const ix = buildCostIndex(records, prices);
+    return { ix, five: windowStatus(ix, resolveSamples(ix, readSamples()), 'five') };
+  })();
+  const cap5h = samples.five?.cap?.median ?? null;
+
+  const out: Record<string, unknown> = {};
+  for (const { root, snaps, sum, tl, costs } of projects) {
     const pts = burnup(snaps);
+    const proj = project(tl, costs, fallback);
     const last = lastActive.get(root) ?? null;
     if (args.json) {
-      out[root] = { summary: sum, burnup: pts, lastActivity: last };
+      out[root] = {
+        summary: sum,
+        burnup: pts,
+        lastActivity: last,
+        costs: { byItem: Object.fromEntries(costs.byItem), outside: costs.outside, total: costs.total, taggedCommits: costs.taggedCommits },
+        projection: proj,
+      };
       continue;
     }
     const n = sum.now;
@@ -282,13 +302,32 @@ function cmdRoadmap(args: Args, records: UsageRecord[]) {
     const idle = last ? Math.floor((Date.now() - last) / 86_400_000) : null;
     for (const t of sum.inProgress)
       console.log(`  in progress: ${itemLabel(t.item.key, t.item.title)} — since ${t.start}${idle != null && idle >= 7 ? `, no Claude activity in this project for ${days(idle)}` : ''}`);
+    for (const t of sum.paused) console.log(`  paused: ${itemLabel(t.item.key, t.item.title)} — since ${t.item.paused}`);
     for (const t of sum.waiting.slice(0, 5)) console.log(`  waiting: ${itemLabel(t.item.key, t.item.title)} — decided ${t.ageDays ? `${days(t.ageDays)} ago` : 'today'}`);
     if (sum.waiting.length > 5) console.log(`  … ${sum.waiting.length - 5} more waiting`);
+
+    // Cost
+    if (costs.total.usd > 0) {
+      const inRoadmap = costs.total.usd - costs.outside.usd;
+      console.log(
+        `  Claude spend: ${money(costs.total.usd, cfg)} total · ${Math.round((inRoadmap / costs.total.usd) * 100)}% on roadmap items` +
+          (costs.taggedCommits ? ` (${costs.taggedCommits} commits tagged with {ID})` : ''),
+      );
+      const top = [...costs.byItem].sort((a, b) => b[1].usd - a[1].usd).slice(0, args.opts.items ? 1000 : 5);
+      const titles = new Map(tl.map((t) => [t.item.key, t.item.title]));
+      for (const [k, s] of top) console.log(`    ${money(s.usd, cfg).padStart(8)}  ${itemLabel(k, titles.get(k) ?? '')}`);
+    }
+    if (proj && proj.remainingPoints > 0) {
+      const basis = proj.basis === 'project' ? `this project's ${proj.basedOnItems} finished items` : 'finished items across all projects';
+      let line = `  to finish ${proj.remainingPoints} open pts: ≈ ${money(proj.usd, cfg)} API-equivalent (${money(proj.usdPerPoint, cfg)}/pt, median of ${basis})`;
+      if (cap5h) line += ` ≈ ${(proj.usd / cap5h).toFixed(1)} five-hour windows`;
+      console.log(line);
+    } else if (!proj && n.openItems) console.log('  to finish: not enough finished items with recorded spend yet (needs 5)');
+
     const noId = sum.warnings.filter((w) => w.includes('no {ID}')).length;
     if (noId) console.log(`  note: ${noId} items have no {ID}; their history is tracked by title, so renaming one breaks its timeline`);
     for (const w of sum.warnings.filter((w) => !w.includes('no {ID}')).slice(0, 3)) console.log(`  note: ${w}`);
-    const tail = pts.slice(-8);
-    console.log(`  burn-up: ${tail.map((p) => `${p.date.slice(5)} ${p.done}/${p.scope}`).join('  ')}`);
+    console.log(`  burn-up: ${pts.slice(-8).map((p) => `${p.date.slice(5)} ${p.done}/${p.scope}`).join('  ')}`);
     console.log('');
   }
   if (args.json) console.log(JSON.stringify(out, null, 2));
@@ -333,7 +372,7 @@ async function main() {
 
   if (args.cmd === 'doctor') return cmdDoctor(roots, res, inRange, prices);
   if (args.cmd === 'usage') return cmdUsage(args, inRange, prices, cfg);
-  if (args.cmd === 'roadmap') return cmdRoadmap(args, res.records);
+  if (args.cmd === 'roadmap') return cmdRoadmap(args, res.records, prices, cfg);
   if (args.cmd === 'limits') {
     // Limits are per account, so imported sessions count unless --local-only.
     const all = args.localOnly ? res.records.filter((r) => r.entrypoint) : res.records;

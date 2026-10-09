@@ -203,6 +203,8 @@ export interface ProgressSummary {
   waiting: ItemTimeline[];
   /** started but not finished */
   inProgress: ItemTimeline[];
+  /** started, then paused (waiting on something) */
+  paused: ItemTimeline[];
   warnings: string[];
 }
 
@@ -225,7 +227,8 @@ export function summarize(snaps: Snapshot[], today = day(Date.now())): ProgressS
     done14d,
     medianLeadDays: leads.length ? leads[leads.length >> 1] : null,
     waiting: tl.filter((t) => t.item.status === 'open' && !t.start).sort((a, b) => (b.ageDays ?? 0) - (a.ageDays ?? 0)),
-    inProgress: tl.filter((t) => t.item.status === 'open' && t.start),
+    inProgress: tl.filter((t) => t.item.status === 'open' && t.start && !t.item.paused),
+    paused: tl.filter((t) => t.item.status === 'open' && t.item.paused),
     warnings: latest.warnings,
   };
 }

@@ -2,7 +2,7 @@
 //
 //   stage: beta
 //   ## Group
-//   - [ ] {ID} Title ~L @decided(2026-10-01) @start(2026-10-02)
+//   - [ ] {ID} Title ~L @decided(2026-10-01) @start(2026-10-02) @paused(2026-10-05)
 //     - [x] {ID.1} Sub-item ~S @done(2026-10-03)
 //   - [-] {ID2} Dropped item @cut(2026-10-04) — why
 //
@@ -27,6 +27,8 @@ export interface Item {
   points: number;
   decided: string | null;
   start: string | null;
+  /** stopped being worked on (e.g. waiting on someone else); no usage is billed to it after this */
+  paused: string | null;
   done: string | null;
   cut: string | null;
   parent: string | null;
@@ -41,7 +43,7 @@ export interface Roadmap {
 }
 
 const ITEM = /^(\s*)[-*+] \[( |x|X|-)\]\s+(.*)$/;
-const TAG_DATE = /@(decided|start|done|cut)\((\d{4}-\d{2}-\d{2})\)/g;
+const TAG_DATE = /@(decided|start|paused|done|cut)\((\d{4}-\d{2}-\d{2})\)/g;
 const SIZE = /(?:^|\s)~(XL|S|M|L)(?=\s|$)/;
 const ID = /^\{([^}\s]+)\}\s*/;
 
@@ -128,6 +130,7 @@ export function parseRoadmap(md: string): Roadmap {
       points: SIZE_POINTS[size],
       decided: dates.decided ?? null,
       start: dates.start ?? null,
+      paused: dates.paused ?? null,
       done: dates.done ?? null,
       cut: dates.cut ?? null,
       parent,
