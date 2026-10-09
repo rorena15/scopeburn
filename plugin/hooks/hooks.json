@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/bin/scopeburn.js\" hook prompt",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

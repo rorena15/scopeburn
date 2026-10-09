@@ -1,6 +1,6 @@
 ---
 name: scopeburn
-description: Solo-dev progress and Claude spend. Use when the user asks how a project is going, what's left, what it cost, or how much of the 5-hour/weekly limit is used. Also use when starting, finishing, deciding, pausing or dropping a roadmap item in a repo that has a ROADMAP.md, and when asked to set up a ROADMAP.md (`/scopeburn init`).
+description: Solo-dev progress and Claude spend. Use when the user asks how a project is going, what's left, what it cost, or how much of the 5-hour/weekly limit is used. Also use whenever work is planned, designed, decided, approved, reprioritized, postponed or dropped (설계, 기획, 계획, 로드맵, 마일스톤, 우선순위, 결정, 하기로, 미루자, 빼자, 진행해, plan, design, roadmap, scope, decide, go ahead) in or for a project that has a ROADMAP.md, so the decision is recorded there; when starting or finishing a roadmap item; and when asked to set up a ROADMAP.md (`/scopeburn init`).
 ---
 
 # scopeburn
@@ -34,6 +34,23 @@ After running, give 3 to 5 lines of interpretation, not the raw output. Lead wit
 
 All money figures are API-equivalent estimates. Say "about".
 
+## When work is planned, designed or decided
+
+This is the moment the roadmap is most often lost. Treat these as roadmap events:
+- a design or plan you proposed gets approved ("진행해", "좋아", "go ahead")
+- the user decides to do something, or changes priorities
+- the user postpones something ("나중에", "미루자") or drops it ("빼자", "접자")
+- a design doc or plan file is written or changed
+
+When one happens in or for a project with a `ROADMAP.md`:
+1. Read the project's `ROADMAP.md` (or the ones the `[scopeburn] Roadmaps here` note lists).
+2. Turn the decision into items. One item per thing that will be built, using the user's words, with a size and `@decided(today)`. Put sub-steps under a parent item when a design has phases.
+3. Postponed items stay open but move to a later section. Dropped items get `[-]`, `@cut(today)` and the reason.
+4. Write the change into the ROADMAP.md together with the design or code change. Tell the user in one line, e.g. "로드맵: {studio.dir} 합주실 목록 화면 ~L 추가, {web.split} 나중으로 이동".
+5. If nothing concrete was decided (only discussion), change nothing.
+
+If the project has no `ROADMAP.md` yet, offer once to create one with `/scopeburn init`; don't create it unasked.
+
 ## Keeping ROADMAP.md current
 
 When the repo you're working in has a `ROADMAP.md`, keep it current as part of the work. Do it in the same commit as the work; never in a separate commit.
@@ -47,7 +64,7 @@ When the repo you're working in has a `ROADMAP.md`, keep it current as part of t
 - Put the item's `{ID}` in the commit message when a commit is mainly about one item. This makes the cost attribution exact. It's optional.
 - Use today's date in the user's local time zone.
 
-When the `[scopeburn] Roadmaps here: …` note appears with a user message, the prompt hook matched planning or decision words. Act on it only if work was actually decided, approved, designed, reprioritized or dropped. Then update the right ROADMAP.md and say in one line what changed.
+When the `[scopeburn] Roadmaps here: …` note appears with a user message, the prompt hook matched planning or decision words. Follow "When work is planned, designed or decided" above.
 
 ## `/scopeburn init`: writing a first ROADMAP.md
 
@@ -62,4 +79,5 @@ When the `[scopeburn] Roadmaps here: …` note appears with a user message, the 
 ## Notes
 - Nothing leaves the machine. scopeburn makes no network requests.
 - Sessions that ran elsewhere and were copied into this machine's logs are counted by default. `--local-only` excludes them.
+- `npx -y scopeburn@latest skill install` installs this skill and the prompt hook together; `skill uninstall` removes both. The hook alone: `npx -y scopeburn@latest hook install|uninstall`.
 - The status line hook (`npx -y scopeburn@latest statusline install`) records `/usage` percentages automatically in terminal Claude Code. IDE extensions may not run status line commands; use `calibrate` there.

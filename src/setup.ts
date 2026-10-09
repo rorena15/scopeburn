@@ -5,6 +5,7 @@ import * as path from 'node:path';
 import skillTemplate from '../skill/SKILL.md';
 import { docTodos, draftRoadmap, gitCommits } from './draft.ts';
 import { ROADMAP_FILE } from './history.ts';
+import { installPromptHook, uninstallPromptHook } from './hook.ts';
 import { repoRootOfPath } from './repo.ts';
 
 export function roadmapTemplate(name: string, today: string): string {
@@ -71,7 +72,8 @@ export function installSkill(): string {
   const prev = existsSync(file) ? readFileSync(file, 'utf8') : null;
   if (prev && !prev.includes('name: scopeburn')) return `${file} exists and isn't scopeburn's; left unchanged`;
   writeFileSync(file, renderSkill(cliCommand()));
-  return `${prev ? 'updated' : 'installed'} ${file}`;
+  // The skill and the prompt hook work as a pair: the hook catches planning moments the skill might miss.
+  return `skill ${prev ? 'updated' : 'installed'}: ${file}\nprompt hook ${installPromptHook()}`;
 }
 
 export function uninstallSkill(): string {
@@ -79,5 +81,5 @@ export function uninstallSkill(): string {
   const file = path.join(dir, 'SKILL.md');
   if (!existsSync(file) || !readFileSync(file, 'utf8').includes('name: scopeburn')) return 'scopeburn skill is not installed';
   rmSync(dir, { recursive: true });
-  return `removed ${dir}`;
+  return `skill removed: ${dir}\nprompt hook: ${uninstallPromptHook()}`;
 }
