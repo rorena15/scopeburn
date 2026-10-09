@@ -95,3 +95,8 @@ export function projectRootOf(p: string): string | null {
   const root = repoRootOf(p) ?? workspaceChildOf(p);
   return root && canon(root);
 }
+
+/** Project root for a directory given on the command line (canonical spelling). */
+export function repoRootOfPath(dir: string): string | null {
+  return projectRootOf(dir);
+}
