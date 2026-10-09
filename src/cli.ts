@@ -5,8 +5,12 @@ import { loadRecords } from './cache.ts';
 import { loadConfig, saveConfig, type Config } from './config.ts';
 import { buildCostIndex, resolveSamples, windowStatus, type WindowStatus } from './limits.ts';
 import { defaultLogRoots, listLogFiles, type Usage, type UsageRecord } from './logs.ts';
-import { burnup, ROADMAP_FILE, snapshots, summarize, timelines } from './history.ts';
-import { finishedRates, itemCosts, project } from './itemcost.ts';
+import { analyzeProjects, discoverRoadmapRoots } from './analyze.ts';
+import { dataDir } from './cache.ts';
+import { buildReportData } from './report-data.ts';
+import { openInBrowser, redact, serve, writeReport } from './report.ts';
+import { initRoadmap, installSkill, uninstallSkill } from './setup.ts';
+import { burnup, ROADMAP_FILE } from './history.ts';
 import { costOf, loadPrices, normalizeModel, type PriceTable } from './prices.ts';
 import { repoRootOfPath } from './repo.ts';
 import { appendSample, installStatusline, readSamples, statuslineMain, uninstallStatusline } from './statusline.ts';
@@ -35,6 +39,7 @@ function parseArgs(argv: string[]): Args {
   let days = 30;
   const rest = [...argv];
   if (rest[0] && !rest[0].startsWith('-')) a.cmd = rest.shift()!;
+  else if (rest[0] === '--help' || rest[0] === '-h') a.cmd = 'help';
   for (let i = 0; i < rest.length; i++) {
     const f = rest[i];
     const val = () => {
@@ -51,6 +56,9 @@ function parseArgs(argv: string[]): Args {
     else if (f === '--no-cache') a.noCache = true;
     else if (f === '--local-only') a.localOnly = true;
     else if (f === '--items') a.opts.items = '1';
+    else if (f === '--open') a.opts.open = '1';
+    else if (f === '--redact') a.opts.redact = '1';
+    else if (f === '--out' || f === '--port') a.opts[f.slice(2)] = val();
     else if (['--billing', '--plan', '--fee', '--currency', '--rate'].includes(f)) a.opts[f.slice(2)] = val();
     else throw new Error(`unknown option: ${f}`);
   }
@@ -239,48 +247,20 @@ function itemLabel(key: string, title: string): string {
 
 function cmdRoadmap(args: Args, records: UsageRecord[], prices: PriceTable, cfg: Config) {
   // Projects: the paths given, else every project seen in the logs (plus cwd) that has a ROADMAP.md.
-  let roots: string[];
-  if (args.positional.length) roots = args.positional.map((p) => repoRootOfPath(path.resolve(p)) ?? path.resolve(p));
-  else {
-    const seen = new Set<string>();
-    for (const r of records) {
-      for (const k of Object.keys(r.repos)) seen.add(k);
-      if (r.cwdRepo) seen.add(r.cwdRepo);
-    }
-    const here = repoRootOfPath(process.cwd());
-    if (here) seen.add(here);
-    roots = [...seen].filter((r) => existsSync(path.join(r, ROADMAP_FILE))).sort();
-  }
+  const roots = args.positional.length
+    ? args.positional.map((p) => repoRootOfPath(path.resolve(p)) ?? path.resolve(p))
+    : discoverRoadmapRoots(records);
   if (!roots.length) {
-    console.log(`No ${ROADMAP_FILE} found. Create one in a project (see docs), or pass a path: scopeburn roadmap <repo>`);
+    console.log(`No ${ROADMAP_FILE} found. Run \`scopeburn init\` in a project, or pass a path: scopeburn roadmap <repo>`);
     return;
   }
-  const usage = attribute(records);
-  const lastActive = new Map<string, number>();
-  for (const it of usage) for (const s of it.shares) lastActive.set(s.repo, Math.max(lastActive.get(s.repo) ?? 0, it.rec.ts));
-
-  // First pass: per-project analysis, and per-point rates pooled across projects as a fallback.
-  const projects = roots.flatMap((root) => {
-    const snaps = snapshots(root);
-    const sum = summarize(snaps);
-    if (!sum) return [];
-    const tl = timelines(snaps);
-    const costs = itemCosts(root, usage, tl, prices);
-    return [{ root, snaps, sum, tl, costs }];
-  });
-  const pooled = projects.flatMap((p) => finishedRates(p.tl, p.costs)).sort((a, b) => a - b);
-  const fallback = pooled.length >= 5 ? pooled[pooled.length >> 1] : null;
-  const samples = (() => {
-    const ix = buildCostIndex(records, prices);
-    return { ix, five: windowStatus(ix, resolveSamples(ix, readSamples()), 'five') };
-  })();
-  const cap5h = samples.five?.cap?.median ?? null;
+  const projects = analyzeProjects(roots, records, prices);
+  const ix = buildCostIndex(records, prices);
+  const cap5h = windowStatus(ix, resolveSamples(ix, readSamples()), 'five')?.cap?.median ?? null;
 
   const out: Record<string, unknown> = {};
-  for (const { root, snaps, sum, tl, costs } of projects) {
+  for (const { root, snaps, sum, tl, costs, proj, lastActive: last } of projects) {
     const pts = burnup(snaps);
-    const proj = project(tl, costs, fallback);
-    const last = lastActive.get(root) ?? null;
     if (args.json) {
       out[root] = {
         summary: sum,
@@ -333,6 +313,20 @@ function cmdRoadmap(args: Args, records: UsageRecord[], prices: PriceTable, cfg:
   if (args.json) console.log(JSON.stringify(out, null, 2));
 }
 
+const HELP = `scopeburn: roadmap burn-up meets Claude Code spend (all local, no network)
+
+  usage      [--days N | --since D --until D] [--by repo|day|model] [--local-only] [--json]
+  roadmap    [repo...] [--items] [--json]        burn-up, waiting items, spend per item, cost to finish
+  limits     [--local-only] [--json]             5-hour / weekly windows, cap estimate, time to cap
+  report     [--out file] [--open] [--redact]    interactive dashboard (one HTML file)
+  serve      [--port 4719] [--open] [--redact]   live dashboard on localhost
+  init       [repo]                              write a ROADMAP.md template
+  calibrate  <5h%> [weekly%]                     record what /usage shows
+  config     [--billing subscription|api] [--plan P] [--fee USD] [--currency C --rate R]
+  statusline install|uninstall                   record /usage numbers automatically (terminal Claude Code)
+  skill      install|uninstall                   install the /scopeburn Claude Code skill
+  doctor                                         parser and attribution diagnostics`;
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
 
@@ -342,6 +336,15 @@ async function main() {
     if (sub === 'uninstall') return console.log(uninstallStatusline());
     return statuslineMain();
   }
+
+  if (args.cmd === 'init') return console.log(initRoadmap(args.positional[0] ?? '.'));
+  if (args.cmd === 'skill') {
+    const sub = args.positional[0];
+    if (sub === 'install') return console.log(installSkill());
+    if (sub === 'uninstall') return console.log(uninstallSkill());
+    throw new Error('usage: scopeburn skill install|uninstall');
+  }
+  if (args.cmd === 'help' || args.cmd === '--help') return console.log(HELP);
 
   const cfg = loadConfig();
   if (args.cmd === 'config') {
@@ -373,6 +376,26 @@ async function main() {
   if (args.cmd === 'doctor') return cmdDoctor(roots, res, inRange, prices);
   if (args.cmd === 'usage') return cmdUsage(args, inRange, prices, cfg);
   if (args.cmd === 'roadmap') return cmdRoadmap(args, res.records, prices, cfg);
+  if (args.cmd === 'report') {
+    let data = buildReportData(res.records, prices, cfg);
+    if (args.opts.redact) data = redact(data);
+    const out = path.resolve(args.opts.out ?? path.join(dataDir(), 'report.html'));
+    writeReport(out, data);
+    console.log(`dashboard written to ${out}`);
+    if (args.opts.open) openInBrowser(out);
+    return;
+  }
+  if (args.cmd === 'serve') {
+    const port = Number(args.opts.port ?? 4719);
+    const url = await serve(async () => {
+      const { res: fresh } = await loadAll({ ...args, noCache: false });
+      const d = buildReportData(fresh.records, loadPrices(), loadConfig());
+      return args.opts.redact ? redact(d) : d;
+    }, port);
+    console.log(`scopeburn dashboard: ${url}  (localhost only, refreshes every minute; Ctrl+C to stop)`);
+    if (args.opts.open) openInBrowser(url);
+    await new Promise(() => {});
+  }
   if (args.cmd === 'limits') {
     // Limits are per account, so imported sessions count unless --local-only.
     const all = args.localOnly ? res.records.filter((r) => r.entrypoint) : res.records;

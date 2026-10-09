@@ -1,0 +1,6 @@
+{
+  "name": "scopeburn",
+  "version": "0.0.1",
+  "description": "Roadmap burn-up meets Claude Code token cost: see scope creep, per-item cost, and how much it will take to finish.",
+  "license": "MIT"
+}

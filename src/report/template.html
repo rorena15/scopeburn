@@ -1,0 +1,678 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>scopeburn</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7; --surface: #fcfcfb; --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --axis: #c3c2b7; --border: rgba(11,11,11,0.10); --wash: rgba(11,11,11,0.04);
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100; --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #e34948;
+  --other: #b9b8b1;
+  --good: #0ca30c; --warning: #fab219; --serious: #ec835a; --critical: #d03b3b; --good-text: #006300;
+  --brush: rgba(42,120,214,0.12);
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10); --wash: rgba(255,255,255,0.05);
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+    --other: #5c5b56; --good-text: #0ca30c; --brush: rgba(57,135,229,0.18);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19; --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --axis: #383835; --border: rgba(255,255,255,0.10); --wash: rgba(255,255,255,0.05);
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500; --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+  --other: #5c5b56; --good-text: #0ca30c; --brush: rgba(57,135,229,0.18);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--page); color: var(--ink); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; }
+main { max-width: 1180px; margin: 0 auto; padding: 20px 16px 64px; }
+header { display: flex; flex-wrap: wrap; align-items: baseline; gap: 8px 16px; margin-bottom: 12px; }
+header h1 { font-size: 20px; margin: 0; letter-spacing: -0.01em; }
+header .meta { color: var(--muted); font-size: 12px; }
+.controls { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 16px; position: sticky; top: 0; z-index: 5; background: var(--page); padding: 8px 0; }
+.seg { display: inline-flex; border: 1px solid var(--border); border-radius: 8px; overflow: hidden; background: var(--surface); }
+.seg button { border: 0; background: none; color: var(--ink-2); padding: 6px 10px; font: inherit; cursor: pointer; }
+.seg button[aria-pressed="true"] { background: var(--wash); color: var(--ink); font-weight: 600; }
+select, input[type="search"], .btn { font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 6px 10px; }
+.btn { cursor: pointer; color: var(--ink-2); }
+.btn:hover, .seg button:hover { background: var(--wash); }
+label.check { display: inline-flex; gap: 6px; align-items: center; color: var(--ink-2); }
+.spacer { flex: 1; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 16px; margin-bottom: 16px; }
+.card h2 { font-size: 15px; margin: 0 0 4px; }
+.card .sub { color: var(--muted); font-size: 12px; margin: 0 0 12px; }
+.card-head { display: flex; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.card-head .spacer { flex: 1; }
+.tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-bottom: 16px; }
+.tile { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+.tile .label { color: var(--ink-2); font-size: 12px; }
+.tile .value { font-size: 26px; font-weight: 650; margin: 2px 0; letter-spacing: -0.01em; }
+.tile .note { color: var(--muted); font-size: 12px; }
+.meter { height: 8px; border-radius: 4px; background: var(--grid); overflow: hidden; margin: 8px 0 4px; }
+.meter > span { display: block; height: 100%; border-radius: 4px; background: var(--s1); }
+.status { display: inline-flex; gap: 4px; align-items: center; font-size: 12px; color: var(--ink-2); }
+.status i { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.legend { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--ink-2); margin-bottom: 6px; }
+.legend button { background: none; border: 0; padding: 0; font: inherit; color: inherit; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.legend button[aria-pressed="false"] { opacity: 0.4; }
+.key { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
+.chart { position: relative; width: 100%; }
+.chart svg { display: block; width: 100%; overflow: visible; }
+.chart text { fill: var(--muted); font-size: 11px; font-variant-numeric: tabular-nums; }
+.tip { position: fixed; pointer-events: none; z-index: 20; background: var(--surface); color: var(--ink); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-size: 12px; box-shadow: 0 4px 16px rgba(0,0,0,0.12); max-width: 320px; display: none; }
+.tip .t { color: var(--muted); margin-bottom: 4px; }
+.tip .row { display: flex; gap: 8px; align-items: center; justify-content: space-between; }
+.tip .row b { font-variant-numeric: tabular-nums; }
+.tip .row span { display: inline-flex; gap: 6px; align-items: center; color: var(--ink-2); }
+.tip ul { margin: 4px 0 0; padding-left: 16px; color: var(--ink-2); }
+.projects { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 12px; }
+.pcard { text-align: left; font: inherit; color: inherit; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; cursor: pointer; }
+.pcard[aria-pressed="true"] { border-color: var(--s1); box-shadow: 0 0 0 1px var(--s1) inset; }
+.pcard .name { font-weight: 650; }
+.chip { display: inline-block; font-size: 11px; color: var(--ink-2); border: 1px solid var(--border); border-radius: 999px; padding: 0 8px; margin-left: 6px; }
+.pcard .nums { color: var(--ink-2); font-size: 12px; margin-top: 4px; }
+.badges { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--grid); vertical-align: top; }
+th { color: var(--ink-2); font-weight: 600; font-size: 12px; white-space: nowrap; }
+th button { all: unset; cursor: pointer; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+tr.item { cursor: pointer; }
+tr.item:hover td { background: var(--wash); }
+tr.detail td { background: var(--wash); color: var(--ink-2); font-size: 12px; }
+td.title { max-width: 420px; }
+.group-row td { color: var(--muted); font-size: 12px; padding-top: 12px; border-bottom: 0; }
+.sim { display: grid; grid-template-columns: minmax(0, 1fr) minmax(220px, 300px); gap: 16px; }
+.sim ul { list-style: none; margin: 0; padding: 0; max-height: 260px; overflow: auto; }
+.sim li label { display: flex; gap: 8px; padding: 3px 0; color: var(--ink-2); }
+.sim .result .value { font-size: 22px; font-weight: 650; }
+.empty { color: var(--muted); padding: 24px 0; text-align: center; }
+.hidden { display: none !important; }
+.foot { color: var(--muted); font-size: 12px; margin-top: 24px; }
+@media (max-width: 720px) { .sim { grid-template-columns: 1fr; } td.title { max-width: 200px; } }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>scopeburn</h1>
+    <span class="meta" id="meta"></span>
+  </header>
+  <div class="controls" role="toolbar">
+    <div class="seg" id="period"></div>
+    <select id="projectFilter" aria-label="project"></select>
+    <select id="modelFilter" aria-label="model"></select>
+    <label class="check"><input type="checkbox" id="imported"> <span data-i18n="imported"></span></label>
+    <span class="spacer"></span>
+    <button class="btn" id="langBtn"></button>
+    <button class="btn" id="themeBtn"></button>
+  </div>
+
+  <section class="tiles" id="tiles"></section>
+
+  <section class="card">
+    <div class="card-head"><h2 data-i18n="dailySpend"></h2><span class="spacer"></span><button class="btn" id="dailyTableBtn" data-i18n="showTable"></button></div>
+    <p class="sub" data-i18n="dailySpendSub"></p>
+    <div class="legend" id="modelLegend"></div>
+    <div class="chart" id="dailyChart"></div>
+    <div id="dailyTable" class="hidden"></div>
+  </section>
+
+  <section class="card">
+    <h2 data-i18n="byProject"></h2>
+    <p class="sub" data-i18n="byProjectSub"></p>
+    <div class="chart" id="projectChart"></div>
+  </section>
+
+  <section class="card">
+    <h2 data-i18n="roadmaps"></h2>
+    <p class="sub" data-i18n="roadmapsSub"></p>
+    <div class="projects" id="projectCards"></div>
+  </section>
+
+  <section id="detail"></section>
+
+  <p class="foot" id="foot"></p>
+</main>
+<div class="tip" id="tip" role="status"></div>
+<script type="application/json" id="data">/*__SCOPEBURN_DATA__*/</script>
+<script>
+(() => {
+'use strict';
+let DATA = JSON.parse(document.getElementById('data').textContent);
+const LIVE = /^https?:$/.test(location.protocol) && document.querySelector('meta[name="scopeburn-live"]');
+
+// ---------- i18n ----------
+const T = {
+  en: {
+    imported: 'include sessions run elsewhere', dailySpend: 'Daily Claude spend', dailySpendSub: 'API-equivalent USD per day, stacked by model',
+    showTable: 'Table', showChart: 'Chart', byProject: 'Spend by project', byProjectSub: 'API-equivalent USD in the selected period',
+    roadmaps: 'Roadmaps', roadmapsSub: 'Projects with a ROADMAP.md. Pick one for its burn-up and item costs.',
+    spend: 'Spend (API-equivalent)', tokens: 'tokens', responses: 'responses', fiveHour: '5-hour window', weekly: 'Weekly window',
+    noWindow: 'No active window', needsCal: 'Cap needs calibration', estCap: 'est. cap', resetsIn: 'resets in', reported: 'reported',
+    hitsAt: 'cap reached around', underCap: 'stays under the cap at this rate', burn: 'burn', perHour: '/h', usedFee: '× your plan fee',
+    allProjects: 'All projects', allModels: 'All models', period: { 7: '7d', 30: '30d', 90: '90d', 0: 'All' },
+    scope: 'Scope', done: 'Done', cut: 'cut', open: 'open', pts: 'pts', burnup: 'Burn-up', burnupSub: 'Scope vs done, in size points. Drag to zoom.',
+    resetZoom: 'Reset zoom', added: 'Added', completed: 'Completed', items: 'Items', search: 'Search items', status: 'Status', item: 'Item',
+    size: 'Size', decided: 'Decided', finished: 'Done / cut', lead: 'Days', cost: 'Spend', statusOpen: 'Open', statusDone: 'Done', statusCut: 'Cut',
+    statusPaused: 'Paused', statusActive: 'In progress', growth: 'growth', growthWarn: 'scope growing faster than work', waitingOld: 'waiting',
+    simulate: 'What will it take to finish?', simulateSub: 'Uncheck items you might cut. Cost = points × median spend per point of finished items.',
+    toFinish: 'to finish', windows: 'five-hour windows', noRate: 'Not enough finished items with spend yet (needs 5).',
+    rateProject: 'this project', rateAll: 'all projects', perPt: '/pt', onRoadmap: 'on roadmap items', outside: 'outside the roadmap',
+    viaCommits: 'via {ID} commits', parent: 'part of', start: 'started', paused: 'paused', lastActive: 'last Claude activity',
+    days: 'd', ago: 'ago', today: 'today', none: 'Nothing in this period.', generated: 'Generated', prices: 'Prices', live: 'live',
+    unpriced: 'No price for', total: 'Total', date: 'Date', other: 'Other', redacted: '',
+  },
+  ko: {
+    imported: '다른 곳에서 실행된 세션 포함', dailySpend: '일별 Claude 사용 금액', dailySpendSub: 'API 가격 환산 USD, 모델별로 쌓음',
+    showTable: '표로 보기', showChart: '차트로 보기', byProject: '프로젝트별 금액', byProjectSub: '선택한 기간의 API 가격 환산 USD',
+    roadmaps: '로드맵', roadmapsSub: 'ROADMAP.md가 있는 프로젝트예요. 고르면 번업과 항목별 비용을 보여줘요.',
+    spend: '사용 금액 (API 환산)', tokens: '토큰', responses: '응답', fiveHour: '5시간 구간', weekly: '주간 구간',
+    noWindow: '진행 중인 구간 없음', needsCal: '한도 보정 필요', estCap: '추정 한도', resetsIn: '재설정까지', reported: '보고된 사용률',
+    hitsAt: '이 속도면 한도 도달', underCap: '이 속도면 재설정 전까지 한도 안', burn: '소모', perHour: '/시간', usedFee: '× 구독료',
+    allProjects: '모든 프로젝트', allModels: '모든 모델', period: { 7: '7일', 30: '30일', 90: '90일', 0: '전체' },
+    scope: '범위', done: '완료', cut: '자름', open: '남음', pts: '점', burnup: '번업', burnupSub: '범위와 완료를 크기 점수로 그렸어요. 끌어서 확대할 수 있어요.',
+    resetZoom: '확대 해제', added: '추가', completed: '완료', items: '항목', search: '항목 검색', status: '상태', item: '항목',
+    size: '크기', decided: '결정', finished: '완료 / 자름', lead: '걸린 날', cost: '금액', statusOpen: '남음', statusDone: '완료', statusCut: '자름',
+    statusPaused: '멈춤', statusActive: '진행 중', growth: '범위 증가율', growthWarn: '범위가 작업보다 빨리 늘어남', waitingOld: '대기',
+    simulate: '끝내려면 얼마나 들까?', simulateSub: '자를 수도 있는 항목은 체크를 빼보세요. 비용 = 점수 × 완료 항목의 점당 비용 중앙값.',
+    toFinish: '끝내는 데', windows: '5시간 구간', noRate: '비용이 기록된 완료 항목이 아직 부족해요 (5개 필요).',
+    rateProject: '이 프로젝트', rateAll: '모든 프로젝트', perPt: '/점', onRoadmap: '로드맵 항목에 연결', outside: '로드맵 밖',
+    viaCommits: '{ID} 커밋으로', parent: '상위 항목', start: '시작', paused: '멈춤', lastActive: '마지막 Claude 활동',
+    days: '일', ago: '전', today: '오늘', none: '이 기간에는 기록이 없어요.', generated: '생성', prices: '단가', live: '실시간',
+    unpriced: '단가 없음', total: '합계', date: '날짜', other: '기타', redacted: '',
+  },
+};
+
+// ---------- state (URL hash) ----------
+const st = { period: 30, project: 'all', model: 'all', imported: true, sel: null, lang: null, zoom: null, q: '', sort: 'decided', dir: 1, hidden: [], open: [], sim: {}, dailyTable: false };
+function readHash() {
+  const h = new URLSearchParams(location.hash.slice(1));
+  if (h.has('p')) st.period = Number(h.get('p')) || 0;
+  if (h.has('proj')) st.project = h.get('proj');
+  if (h.has('model')) st.model = h.get('model');
+  if (h.has('imp')) st.imported = h.get('imp') !== '0';
+  if (h.has('sel')) st.sel = h.get('sel');
+  if (h.has('lang')) st.lang = h.get('lang');
+}
+function writeHash() {
+  const h = new URLSearchParams({ p: st.period, proj: st.project, model: st.model, imp: st.imported ? 1 : 0 });
+  if (st.sel) h.set('sel', st.sel);
+  if (st.lang) h.set('lang', st.lang);
+  history.replaceState(null, '', '#' + h.toString());
+}
+readHash();
+const lang = () => st.lang || ((navigator.language || 'en').toLowerCase().startsWith('ko') ? 'ko' : 'en');
+const t = (k) => (T[lang()] && T[lang()][k] != null ? T[lang()][k] : T.en[k]);
+
+// ---------- helpers ----------
+const $ = (id) => document.getElementById(id);
+const NS = 'http://www.w3.org/2000/svg';
+function el(tag, attrs, ...kids) {
+  const e = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})) {
+    if (v == null || v === false) continue;
+    if (k === 'class') e.className = v; else if (k.startsWith('on')) e.addEventListener(k.slice(2), v); else e.setAttribute(k, v === true ? '' : v);
+  }
+  for (const c of kids.flat()) if (c != null && c !== false) e.append(c instanceof Node ? c : document.createTextNode(String(c)));
+  return e;
+}
+function sv(tag, attrs, ...kids) {
+  const e = document.createElementNS(NS, tag);
+  for (const [k, v] of Object.entries(attrs || {})) if (v != null) e.setAttribute(k, v);
+  for (const c of kids.flat()) if (c != null) e.append(c instanceof Node ? c : document.createTextNode(String(c)));
+  return e;
+}
+const fmtUsd = (x) => {
+  const c = DATA.config;
+  const base = '$' + (x >= 1000 ? Math.round(x).toLocaleString() : x >= 100 ? x.toFixed(0) : x.toFixed(2));
+  return c.currency && c.ratePerUsd ? `${base} (${Math.round(x * c.ratePerUsd).toLocaleString()} ${c.currency})` : base;
+};
+const fmtUsdShort = (x) => '$' + (x >= 1000 ? (x / 1000).toFixed(1) + 'k' : x >= 100 ? x.toFixed(0) : x >= 10 ? x.toFixed(1) : x.toFixed(2));
+const fmtTok = (n) => (n >= 1e9 ? (n / 1e9).toFixed(2) + 'B' : n >= 1e6 ? (n / 1e6).toFixed(1) + 'M' : n >= 1e3 ? (n / 1e3).toFixed(1) + 'K' : String(Math.round(n)));
+const dayMs = 86400000;
+const toDate = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d); };
+const dayStr = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+const fmtTime = (ms) => { const d = new Date(ms); return `${dayStr(d)} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`; };
+const css = (v) => getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+
+// Model colors follow the model (its index in the full model list), never its rank in the current view.
+function modelColor(name) {
+  const i = DATA.dims.models.indexOf(name);
+  return i >= 0 && i < 8 ? `var(--s${i + 1})` : 'var(--other)';
+}
+
+// ---------- tooltip ----------
+const tip = $('tip');
+function showTip(ev, build) {
+  tip.replaceChildren(...build());
+  tip.style.display = 'block';
+  const pad = 14, w = tip.offsetWidth, h = tip.offsetHeight;
+  let x = ev.clientX + pad, y = ev.clientY + pad;
+  if (x + w > innerWidth - 8) x = ev.clientX - w - pad;
+  if (y + h > innerHeight - 8) y = ev.clientY - h - pad;
+  tip.style.left = Math.max(8, x) + 'px';
+  tip.style.top = Math.max(8, y) + 'px';
+}
+const hideTip = () => { tip.style.display = 'none'; };
+const tipRow = (color, label, value) => el('div', { class: 'row' }, el('span', {}, color ? el('i', { class: 'key', style: `background:${color}` }) : null, label), el('b', {}, value));
+
+// ---------- filtering ----------
+function rangeStart() {
+  if (!st.period) return null;
+  const d = new Date(); d.setHours(0, 0, 0, 0);
+  return dayStr(new Date(d.getTime() - (st.period - 1) * dayMs));
+}
+function filteredRows() {
+  const from = rangeStart();
+  const pi = st.project === 'all' ? -1 : DATA.dims.projects.indexOf(st.project);
+  const mi = st.model === 'all' ? -1 : DATA.dims.models.indexOf(st.model);
+  return DATA.daily.filter((r) => (!from || r[0] >= from) && (pi < 0 || r[1] === pi) && (mi < 0 || r[2] === mi) && (st.imported || !r[3]));
+}
+
+// ---------- controls ----------
+function renderControls() {
+  document.documentElement.lang = lang();
+  for (const n of document.querySelectorAll('[data-i18n]')) n.textContent = t(n.dataset.i18n);
+  $('dailyTableBtn').textContent = st.dailyTable ? t('showChart') : t('showTable');
+  const per = $('period');
+  per.replaceChildren(...[7, 30, 90, 0].map((p) => el('button', { 'aria-pressed': String(st.period === p), onclick: () => { st.period = p; update(); } }, t('period')[p])));
+  const projTotals = new Map();
+  for (const r of DATA.daily) projTotals.set(r[1], (projTotals.get(r[1]) || 0) + r[4]);
+  const projOpts = [...projTotals].sort((a, b) => b[1] - a[1]).map(([i]) => DATA.dims.projects[i]);
+  const ps = $('projectFilter');
+  ps.replaceChildren(el('option', { value: 'all' }, t('allProjects')), ...projOpts.map((p) => el('option', { value: p, selected: st.project === p }, p)));
+  ps.value = st.project;
+  const ms = $('modelFilter');
+  ms.replaceChildren(el('option', { value: 'all' }, t('allModels')), ...DATA.dims.models.map((m) => el('option', { value: m }, m)));
+  ms.value = st.model;
+  $('imported').checked = st.imported;
+  $('langBtn').textContent = lang() === 'ko' ? 'English' : '한국어';
+  const theme = document.documentElement.dataset.theme;
+  $('themeBtn').textContent = theme === 'dark' ? '☀' : theme === 'light' ? '☾' : '◐';
+  $('themeBtn').title = 'theme';
+  $('meta').textContent = `${t('generated')} ${fmtTime(DATA.generatedAt)}${LIVE ? ' · ' + t('live') : ''}`;
+}
+$('projectFilter').onchange = (e) => { st.project = e.target.value; update(); };
+$('modelFilter').onchange = (e) => { st.model = e.target.value; update(); };
+$('imported').onchange = (e) => { st.imported = e.target.checked; update(); };
+$('langBtn').onclick = () => { st.lang = lang() === 'ko' ? 'en' : 'ko'; update(); };
+$('themeBtn').onclick = () => {
+  const cur = document.documentElement.dataset.theme;
+  const next = cur === 'dark' ? 'light' : cur === 'light' ? '' : (matchMedia('(prefers-color-scheme: dark)').matches ? 'light' : 'dark');
+  if (next) document.documentElement.dataset.theme = next; else delete document.documentElement.dataset.theme;
+  try { localStorage.setItem('scopeburn-theme', next); } catch {}
+  update();
+};
+try { const th = localStorage.getItem('scopeburn-theme'); if (th) document.documentElement.dataset.theme = th; } catch {}
+$('dailyTableBtn').onclick = () => { st.dailyTable = !st.dailyTable; update(); };
+
+// ---------- tiles ----------
+function renderTiles(rows) {
+  const usd = rows.reduce((s, r) => s + r[4], 0);
+  const tok = rows.reduce((s, r) => s + r[5], 0);
+  const tiles = [];
+  const c = DATA.config;
+  let feeNote = null;
+  if (c.billing === 'subscription' && c.monthlyFeeUsd) {
+    const days = st.period || Math.max(1, Math.round((Date.now() - toDate(DATA.daily[0]?.[0] || dayStr(new Date())).getTime()) / dayMs));
+    feeNote = `${(usd / ((c.monthlyFeeUsd * days) / 30)).toFixed(1)}${t('usedFee')}`;
+  }
+  tiles.push(el('div', { class: 'tile' }, el('div', { class: 'label' }, t('spend')), el('div', { class: 'value' }, fmtUsd(usd)), el('div', { class: 'note' }, `${fmtTok(tok)} ${t('tokens')}${feeNote ? ' · ' + feeNote : ''}`)));
+  for (const [key, w] of [['fiveHour', DATA.limits.five], ['weekly', DATA.limits.week]]) {
+    if (!w) { tiles.push(el('div', { class: 'tile' }, el('div', { class: 'label' }, t(key)), el('div', { class: 'value' }, '—'), el('div', { class: 'note' }, t('noWindow')))); continue; }
+    const cap = w.cap ? w.cap.median : null;
+    const pct = w.reportedPct != null ? w.reportedPct : cap ? (w.spent / cap) * 100 : null;
+    const left = Math.max(0, w.end - Date.now());
+    const hh = Math.floor(left / 3600000), mm = Math.round((left % 3600000) / 60000);
+    const level = pct == null ? null : pct >= 90 ? 'critical' : pct >= 75 ? 'serious' : pct >= 50 ? 'warning' : 'good';
+    const statusLabel = { good: 'OK', warning: '50%+', serious: '75%+', critical: '90%+' };
+    tiles.push(el('div', { class: 'tile' },
+      el('div', { class: 'label' }, t(key), level ? el('span', { class: 'status', style: 'margin-left:8px' }, el('i', { style: `background:var(--${level})` }), statusLabel[level]) : null),
+      el('div', { class: 'value' }, pct != null ? `${Math.round(pct)}%` : fmtUsd(w.spent)),
+      pct != null ? el('div', { class: 'meter', role: 'meter', 'aria-valuenow': Math.round(pct), 'aria-valuemin': 0, 'aria-valuemax': 100 }, el('span', { style: `width:${Math.min(100, pct)}%` })) : null,
+      el('div', { class: 'note' }, [
+        `${t('resetsIn')} ${hh}h ${mm}m`,
+        `${t('burn')} ${fmtUsd(w.burnPerHour)}${t('perHour')}`,
+        cap ? `${t('estCap')} ${fmtUsd(cap)} (n=${w.cap.samples})` : t('needsCal'),
+        w.hitsCapAt ? `${t('hitsAt')} ${fmtTime(w.hitsCapAt).slice(11)}` : cap && w.burnPerHour > 0 ? t('underCap') : null,
+      ].filter(Boolean).join(' · '))));
+  }
+  $('tiles').replaceChildren(...tiles);
+}
+
+// ---------- daily stacked bars ----------
+function renderDaily(rows) {
+  const box = $('dailyChart');
+  const tableBox = $('dailyTable');
+  box.classList.toggle('hidden', st.dailyTable);
+  tableBox.classList.toggle('hidden', !st.dailyTable);
+  const from = rangeStart() || (rows[0] ? rows[0][0] : dayStr(new Date()));
+  const days = [];
+  for (let d = toDate(from); d <= new Date(); d = new Date(d.getTime() + dayMs)) days.push(dayStr(d));
+  const by = new Map(days.map((d) => [d, new Map()]));
+  for (const r of rows) {
+    const m = by.get(r[0]); if (!m) continue;
+    const name = DATA.dims.models[r[2]];
+    m.set(name, (m.get(name) || 0) + r[4]);
+  }
+  const present = DATA.dims.models.filter((m) => rows.some((r) => DATA.dims.models[r[2]] === m));
+  const visible = present.filter((m) => !st.hidden.includes(m));
+  $('modelLegend').replaceChildren(...(present.length > 1 ? present.map((m) => el('button', { 'aria-pressed': String(!st.hidden.includes(m)), onclick: () => { st.hidden = st.hidden.includes(m) ? st.hidden.filter((x) => x !== m) : [...st.hidden, m]; update(); } }, el('i', { class: 'key', style: `background:${modelColor(m)};height:8px;width:8px;border-radius:2px` }), m)) : []));
+  if (!rows.length) { box.replaceChildren(el('div', { class: 'empty' }, t('none'))); tableBox.replaceChildren(); return; }
+
+  // table view
+  tableBox.replaceChildren(el('table', {}, el('thead', {}, el('tr', {}, el('th', {}, t('date')), ...visible.map((m) => el('th', { class: 'num' }, m)), el('th', { class: 'num' }, t('total')))),
+    el('tbody', {}, ...days.filter((d) => by.get(d).size).map((d) => { const m = by.get(d); let tot = 0; return el('tr', {}, el('td', {}, d), ...visible.map((x) => { const v = m.get(x) || 0; tot += v; return el('td', { class: 'num' }, v ? fmtUsdShort(v) : ''); }), el('td', { class: 'num' }, fmtUsdShort(tot))); }))));
+  if (st.dailyTable) return;
+
+  const W = Math.max(320, box.clientWidth), H = 220, m = { l: 44, r: 8, t: 8, b: 22 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const totals = days.map((d) => visible.reduce((s, x) => s + (by.get(d).get(x) || 0), 0));
+  const max = Math.max(1, ...totals);
+  const step = niceStep(max / 4);
+  const top = Math.ceil(max / step) * step;
+  const y = (v) => m.t + ih - (v / top) * ih;
+  const bw = iw / days.length;
+  const barW = Math.max(1, Math.min(28, bw - 2));
+  const svg = sv('svg', { viewBox: `0 0 ${W} ${H}`, height: H, role: 'img', 'aria-label': t('dailySpend') });
+  for (let v = 0; v <= top + 1e-9; v += step) {
+    svg.append(sv('line', { x1: m.l, x2: W - m.r, y1: y(v), y2: y(v), stroke: v === 0 ? 'var(--axis)' : 'var(--grid)', 'stroke-width': 1 }));
+    svg.append(sv('text', { x: m.l - 6, y: y(v) + 4, 'text-anchor': 'end' }, fmtUsdShort(v)));
+  }
+  const labelEvery = Math.ceil(days.length / Math.max(2, Math.floor(iw / 70)));
+  days.forEach((d, i) => {
+    const x = m.l + i * bw + (bw - barW) / 2;
+    if (i % labelEvery === 0) svg.append(sv('text', { x: x + barW / 2, y: H - 6, 'text-anchor': 'middle' }, d.slice(5)));
+    let acc = 0;
+    const segs = visible.map((name) => [name, by.get(d).get(name) || 0]).filter(([, v]) => v > 0);
+    const g = sv('g', { tabindex: segs.length ? 0 : null });
+    segs.forEach(([name, v], si) => {
+      const y0 = y(acc), y1 = y(acc + v);
+      const h = Math.max(0, y0 - y1 - (si < segs.length - 1 ? 2 : 0)); // 2px surface gap between segments
+      const isTop = si === segs.length - 1;
+      const r = isTop ? Math.min(4, barW / 2, h) : 0;
+      const yy = y1 + (si < segs.length - 1 ? 0 : 0);
+      g.append(sv('path', { d: roundedTop(x, yy, barW, Math.max(h, 0.5), r), fill: modelColor(name) }));
+      acc += v;
+    });
+    // hit target: the full column
+    const hit = sv('rect', { x: m.l + i * bw, y: m.t, width: bw, height: ih, fill: 'transparent' });
+    const show = (ev) => showTip(ev, () => [el('div', { class: 't' }, d), ...segs.slice().reverse().map(([n, v]) => tipRow(modelColor(n), n, fmtUsd(v))), segs.length > 1 ? tipRow(null, t('total'), fmtUsd(totals[i])) : null, !segs.length ? el('div', {}, '—') : null].filter(Boolean));
+    hit.addEventListener('pointermove', show);
+    hit.addEventListener('pointerleave', hideTip);
+    g.addEventListener('focus', (ev) => { const b = g.getBoundingClientRect(); show({ clientX: b.right, clientY: b.top }); });
+    g.addEventListener('blur', hideTip);
+    g.append(hit);
+    svg.append(g);
+  });
+  box.replaceChildren(svg);
+}
+function roundedTop(x, y, w, h, r) {
+  if (r <= 0) return `M${x},${y}h${w}v${h}h${-w}z`;
+  return `M${x},${y + h}V${y + r}Q${x},${y} ${x + r},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h}Z`;
+}
+function niceStep(raw) {
+  if (raw <= 0) return 1;
+  const p = 10 ** Math.floor(Math.log10(raw));
+  const f = raw / p;
+  return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p;
+}
+
+// ---------- by project (single-series horizontal bars) ----------
+function renderByProject(rows) {
+  const box = $('projectChart');
+  const tot = new Map();
+  for (const r of rows) tot.set(r[1], (tot.get(r[1]) || 0) + r[4]);
+  let list = [...tot].map(([i, v]) => [DATA.dims.projects[i], v]).filter(([, v]) => v > 0.005).sort((a, b) => b[1] - a[1]);
+  if (!list.length) { box.replaceChildren(el('div', { class: 'empty' }, t('none'))); return; }
+  if (list.length > 10) { const rest = list.slice(9).reduce((s, [, v]) => s + v, 0); list = [...list.slice(0, 9), [t('other'), rest]]; }
+  const W = Math.max(320, box.clientWidth), rowH = 26, H = list.length * rowH + 4;
+  const labelW = Math.min(200, W * 0.32), valW = 70, iw = W - labelW - valW - 8;
+  const max = list[0][1];
+  const sum = list.reduce((s, [, v]) => s + v, 0);
+  const svg = sv('svg', { viewBox: `0 0 ${W} ${H}`, height: H, role: 'img', 'aria-label': t('byProject') });
+  list.forEach(([name, v], i) => {
+    const y = i * rowH + 4, w = Math.max(2, (v / max) * iw);
+    svg.append(sv('text', { x: labelW - 8, y: y + 13, 'text-anchor': 'end', style: 'fill:var(--ink-2);font-size:12px' }, name.length > 26 ? name.slice(0, 25) + '…' : name));
+    const bar = sv('path', { d: roundedRight(labelW, y + 4, w, 12, 4), fill: 'var(--s1)', tabindex: 0 });
+    const show = (ev) => showTip(ev, () => [el('div', { class: 't' }, name), tipRow(null, t('spend'), fmtUsd(v)), tipRow(null, '%', `${((v / sum) * 100).toFixed(1)}%`)]);
+    bar.addEventListener('pointermove', show); bar.addEventListener('pointerleave', hideTip);
+    svg.append(bar);
+    svg.append(sv('text', { x: labelW + w + 6, y: y + 14, style: 'fill:var(--ink-2)' }, fmtUsdShort(v)));
+  });
+  box.replaceChildren(svg);
+}
+const roundedRight = (x, y, w, h, r) => { r = Math.min(r, w, h / 2); return `M${x},${y}H${x + w - r}Q${x + w},${y} ${x + w},${y + r}V${y + h - r}Q${x + w},${y + h} ${x + w - r},${y + h}H${x}Z`; };
+
+// ---------- roadmap cards ----------
+function renderCards() {
+  const box = $('projectCards');
+  if (!DATA.projects.length) { box.replaceChildren(el('div', { class: 'empty' }, 'ROADMAP.md — `scopeburn init`')); return; }
+  if (!st.sel || !DATA.projects.some((p) => p.name === st.sel)) st.sel = DATA.projects[0].name;
+  box.replaceChildren(...DATA.projects.map((p) => {
+    const pct = p.scope ? Math.round((p.done / p.scope) * 100) : 0;
+    const badges = [];
+    if (p.growthRatio != null && p.growthRatio > 1) badges.push(el('span', { class: 'status' }, el('i', { style: 'background:var(--serious)' }), `${t('growth')} ${p.growthRatio.toFixed(1)}`));
+    const waiting = p.items.filter((i) => i.status === 'open' && !i.start && (i.ageDays || 0) >= 14).length;
+    if (waiting) badges.push(el('span', { class: 'status' }, el('i', { style: 'background:var(--warning)' }), `${t('waitingOld')} 14${t('days')}+ ×${waiting}`));
+    const paused = p.items.filter((i) => i.status === 'open' && i.paused).length;
+    if (paused) badges.push(el('span', { class: 'status' }, el('i', { style: 'background:var(--muted)' }), `${t('statusPaused')} ×${paused}`));
+    return el('button', { class: 'pcard', 'aria-pressed': String(st.sel === p.name), onclick: () => { st.sel = p.name; st.zoom = null; st.sim = {}; update(); document.getElementById('detail').scrollIntoView({ behavior: 'smooth', block: 'start' }); } },
+      el('div', {}, el('span', { class: 'name' }, p.name), p.stage ? el('span', { class: 'chip' }, p.stage) : null),
+      el('div', { class: 'meter' }, el('span', { style: `width:${pct}%` })),
+      el('div', { class: 'nums' }, `${t('done')} ${p.done}/${p.scope} ${t('pts')} (${pct}%) · ${t('open')} ${p.openItems}${p.cut ? ` · ${t('cut')} ${p.cut}` : ''}`),
+      sparkline(p.burnup),
+      badges.length ? el('div', { class: 'badges' }, badges) : null);
+  }));
+}
+function sparkline(pts) {
+  const W = 240, H = 36;
+  if (pts.length < 2) return null;
+  const xs = pts.map((p) => toDate(p.date).getTime());
+  const x0 = xs[0], x1 = xs[xs.length - 1] || x0 + 1;
+  const max = Math.max(1, ...pts.map((p) => p.scope));
+  const X = (v) => ((v - x0) / Math.max(1, x1 - x0)) * (W - 4) + 2, Y = (v) => H - 2 - (v / max) * (H - 4);
+  const line = (k) => pts.map((p, i) => `${i ? 'H' + X(xs[i]) + 'V' : 'M' + X(xs[i]) + ','}${Y(p[k])}`).join('');
+  return sv('svg', { viewBox: `0 0 ${W} ${H}`, height: H, style: 'width:100%;margin-top:6px', 'aria-hidden': 'true' },
+    sv('path', { d: line('scope'), fill: 'none', stroke: 'var(--muted)', 'stroke-width': 1.5 }),
+    sv('path', { d: line('done'), fill: 'none', stroke: 'var(--s1)', 'stroke-width': 2 }));
+}
+
+// ---------- project detail ----------
+function renderDetail() {
+  const box = $('detail');
+  const p = DATA.projects.find((x) => x.name === st.sel);
+  if (!p) { box.replaceChildren(); return; }
+  const onRoadmap = p.spend.total ? Math.round(((p.spend.total - p.spend.outside) / p.spend.total) * 100) : 0;
+  box.replaceChildren(
+    el('section', { class: 'card' },
+      el('div', { class: 'card-head' }, el('h2', {}, `${p.name} · ${t('burnup')}`), el('span', { class: 'spacer' }), st.zoom ? el('button', { class: 'btn', onclick: () => { st.zoom = null; update(); } }, t('resetZoom')) : null),
+      el('p', { class: 'sub' }, [
+        t('burnupSub'),
+        p.growthRatio != null ? `${t('growth')} ${p.growthRatio.toFixed(2)}${p.growthRatio > 1 ? ' — ' + t('growthWarn') : ''}` : null,
+        p.spend.total ? `${fmtUsd(p.spend.total)} · ${onRoadmap}% ${t('onRoadmap')}` : null,
+        p.lastActive ? `${t('lastActive')} ${fmtTime(p.lastActive)}` : null,
+      ].filter(Boolean).join(' · ')),
+      el('div', { class: 'legend' }, el('span', {}, el('i', { class: 'key', style: 'background:var(--muted)' }), ' ', t('scope')), el('span', {}, el('i', { class: 'key', style: 'background:var(--s1)' }), ' ', t('done'))),
+      el('div', { class: 'chart', id: 'burnChart' })),
+    simulator(p),
+    itemsTable(p));
+  drawBurnup(p);
+}
+
+function drawBurnup(p) {
+  const box = $('burnChart');
+  const all = p.burnup;
+  if (!all.length) { box.replaceChildren(el('div', { class: 'empty' }, t('none'))); return; }
+  const pts = st.zoom ? all.filter((q) => q.date >= st.zoom[0] && q.date <= st.zoom[1]) : all;
+  const W = Math.max(320, box.clientWidth), H = 260, m = { l: 40, r: 56, t: 10, b: 22 };
+  const iw = W - m.l - m.r, ih = H - m.t - m.b;
+  const xs = pts.map((q) => toDate(q.date).getTime());
+  const x0 = xs[0], x1 = Math.max(xs[xs.length - 1], x0 + dayMs);
+  const X = (v) => m.l + ((v - x0) / (x1 - x0)) * iw;
+  const max = Math.max(1, ...pts.map((q) => q.scope));
+  const step = niceStep(max / 4), top = Math.ceil(max / step) * step;
+  const Y = (v) => m.t + ih - (v / top) * ih;
+  const svg = sv('svg', { viewBox: `0 0 ${W} ${H}`, height: H, role: 'img', 'aria-label': t('burnup') });
+  for (let v = 0; v <= top + 1e-9; v += step) {
+    svg.append(sv('line', { x1: m.l, x2: W - m.r, y1: Y(v), y2: Y(v), stroke: v === 0 ? 'var(--axis)' : 'var(--grid)' }));
+    svg.append(sv('text', { x: m.l - 6, y: Y(v) + 4, 'text-anchor': 'end' }, String(Math.round(v))));
+  }
+  const ticks = Math.max(2, Math.min(pts.length, Math.floor(iw / 80)));
+  for (let i = 0; i < ticks; i++) {
+    const v = x0 + ((x1 - x0) * i) / (ticks - 1);
+    svg.append(sv('text', { x: X(v), y: H - 6, 'text-anchor': i === 0 ? 'start' : i === ticks - 1 ? 'end' : 'middle' }, dayStr(new Date(v)).slice(5)));
+  }
+  const stepPath = (k) => pts.map((q, i) => (i ? `H${X(xs[i])}V${Y(q[k])}` : `M${X(xs[i])},${Y(q[k])}`)).join('');
+  svg.append(sv('path', { d: stepPath('scope'), fill: 'none', stroke: 'var(--muted)', 'stroke-width': 2, 'stroke-linejoin': 'round' }));
+  svg.append(sv('path', { d: stepPath('done'), fill: 'none', stroke: 'var(--s1)', 'stroke-width': 2, 'stroke-linejoin': 'round' }));
+  // cut markers on the scope line
+  pts.forEach((q, i) => { if (q.cutItems.length) svg.append(sv('path', { d: `M${X(xs[i]) - 4},${Y(q.scope) - 4}l8,8m0,-8l-8,8`, stroke: 'var(--ink-2)', 'stroke-width': 2, 'stroke-linecap': 'round' })); });
+  // direct labels at the end
+  const last = pts[pts.length - 1];
+  svg.append(sv('text', { x: W - m.r + 6, y: Y(last.scope) + 4, style: 'fill:var(--ink-2)' }, `${t('scope')} ${last.scope}`));
+  svg.append(sv('text', { x: W - m.r + 6, y: Math.min(Y(last.done) + 4, Y(last.scope) + 18 > Y(last.done) + 4 ? Y(last.scope) + 18 : Y(last.done) + 4), style: 'fill:var(--ink-2)' }, `${t('done')} ${last.done}`));
+  // crosshair + tooltip + brush zoom
+  const cross = sv('line', { y1: m.t, y2: m.t + ih, stroke: 'var(--axis)', visibility: 'hidden' });
+  const dotS = sv('circle', { r: 4, fill: 'var(--muted)', stroke: 'var(--surface)', 'stroke-width': 2, visibility: 'hidden' });
+  const dotD = sv('circle', { r: 4, fill: 'var(--s1)', stroke: 'var(--surface)', 'stroke-width': 2, visibility: 'hidden' });
+  const brush = sv('rect', { y: m.t, height: ih, fill: 'var(--brush)', visibility: 'hidden' });
+  const hit = sv('rect', { x: m.l, y: m.t, width: iw, height: ih, fill: 'transparent', style: 'cursor:crosshair;touch-action:none' });
+  svg.append(brush, cross, dotS, dotD, hit);
+  const titleOf = new Map(p.items.map((i) => [i.key, i.title]));
+  const nearest = (cx) => { let bi = 0, bd = Infinity; xs.forEach((v, i) => { const d = Math.abs(X(v) - cx); if (d < bd) { bd = d; bi = i; } }); return bi; };
+  const local = (ev) => { const r = svg.getBoundingClientRect(); return ((ev.clientX - r.left) / r.width) * W; };
+  let drag = null;
+  hit.addEventListener('pointerdown', (ev) => { drag = local(ev); hit.setPointerCapture(ev.pointerId); });
+  hit.addEventListener('pointermove', (ev) => {
+    const cx = local(ev);
+    if (drag != null) { brush.setAttribute('x', Math.min(drag, cx)); brush.setAttribute('width', Math.abs(cx - drag)); brush.setAttribute('visibility', 'visible'); }
+    const i = nearest(cx), q = pts[i];
+    for (const [n, v] of [[cross, null], [dotS, q.scope], [dotD, q.done]]) {
+      n.setAttribute('visibility', 'visible');
+      if (v == null) { n.setAttribute('x1', X(xs[i])); n.setAttribute('x2', X(xs[i])); } else { n.setAttribute('cx', X(xs[i])); n.setAttribute('cy', Y(v)); }
+    }
+    const list = (label, keys) => keys.length ? [el('div', { class: 't', style: 'margin-top:6px' }, `${label} (${keys.length})`), el('ul', {}, keys.slice(0, 6).map((k) => el('li', {}, titleOf.get(k) || k)), keys.length > 6 ? el('li', {}, '…') : null)] : [];
+    showTip(ev, () => [el('div', { class: 't' }, q.date), tipRow('var(--s1)', t('done'), `${q.done} ${t('pts')}`), tipRow('var(--muted)', t('scope'), `${q.scope} ${t('pts')}`),
+      ...list(t('added'), q.added), ...list(t('completed'), q.completed), ...list(t('statusCut'), q.cutItems)]);
+  });
+  hit.addEventListener('pointerup', (ev) => {
+    const cx = local(ev);
+    if (drag != null && Math.abs(cx - drag) > 12) {
+      const a = nearest(Math.min(drag, cx)), b = nearest(Math.max(drag, cx));
+      if (b > a) { st.zoom = [pts[a].date, pts[b].date]; drag = null; hideTip(); update(); return; }
+    }
+    drag = null; brush.setAttribute('visibility', 'hidden');
+  });
+  hit.addEventListener('pointerleave', () => { if (drag == null) { hideTip(); for (const n of [cross, dotS, dotD]) n.setAttribute('visibility', 'hidden'); } });
+  hit.addEventListener('dblclick', () => { st.zoom = null; update(); });
+  box.replaceChildren(svg);
+}
+
+function simulator(p) {
+  const open = p.items.filter((i) => i.status === 'open');
+  const cap = DATA.limits.five && DATA.limits.five.cap ? DATA.limits.five.cap.median : null;
+  const result = el('div', { class: 'result' });
+  const recompute = () => {
+    const pts = open.filter((i) => st.sim[i.key] !== false).reduce((s, i) => s + i.points, 0);
+    if (p.usdPerPoint == null) { result.replaceChildren(el('div', { class: 'note' }, t('noRate'))); return; }
+    const usd = pts * p.usdPerPoint;
+    result.replaceChildren(
+      el('div', { class: 'label' }, `${t('toFinish')} ${pts} ${t('pts')}`),
+      el('div', { class: 'value' }, fmtUsd(usd)),
+      el('div', { class: 'note' }, `${fmtUsd(p.usdPerPoint)}${t('perPt')} · ${p.rateBasis === 'project' ? t('rateProject') : t('rateAll')}`),
+      ...(cap ? [el('div', { class: 'note' }, `≈ ${(usd / cap).toFixed(1)} ${t('windows')}`)] : []));
+  };
+  recompute();
+  return el('section', { class: 'card' },
+    el('h2', {}, t('simulate')), el('p', { class: 'sub' }, t('simulateSub')),
+    open.length ? el('div', { class: 'sim' },
+      el('ul', {}, open.map((i) => el('li', {}, el('label', {}, el('input', { type: 'checkbox', checked: st.sim[i.key] !== false, onchange: (e) => { st.sim[i.key] = e.target.checked; recompute(); } }), `${i.title} · ${i.size}`)))),
+      result) : el('div', { class: 'empty' }, '—'));
+}
+
+function statusOf(i) {
+  if (i.status === 'done') return ['statusDone', 'var(--good)'];
+  if (i.status === 'cut') return ['statusCut', 'var(--muted)'];
+  if (i.paused) return ['statusPaused', 'var(--muted)'];
+  if (i.start) return ['statusActive', 'var(--s1)'];
+  return ['statusOpen', 'var(--axis)'];
+}
+
+function itemsTable(p) {
+  const cols = [
+    ['status', t('status')], ['title', t('item')], ['points', t('size'), 'num'], ['decided', t('decided')], ['finished', t('finished')], ['lead', t('lead'), 'num'], ['usd', t('cost'), 'num'],
+  ];
+  const val = (i, k) => k === 'finished' ? (i.done || i.cut || '') : k === 'lead' ? (i.leadDays ?? i.ageDays ?? -1) : k === 'status' ? statusOf(i)[0] : i[k] ?? '';
+  const q = st.q.toLowerCase();
+  const rows = p.items.filter((i) => !q || i.title.toLowerCase().includes(q) || i.key.toLowerCase().includes(q))
+    .sort((a, b) => { const x = val(a, st.sort), y = val(b, st.sort); return (x > y ? 1 : x < y ? -1 : 0) * st.dir; });
+  const search = el('input', { type: 'search', placeholder: t('search'), value: st.q, style: 'min-width:200px' });
+  search.addEventListener('input', (e) => { st.q = e.target.value; const pos = e.target.selectionStart; update(); const s = document.querySelector('#detail input[type=search]'); if (s) { s.focus(); s.setSelectionRange(pos, pos); } });
+  const body = el('tbody');
+  for (const i of rows) {
+    const [sk, color] = statusOf(i);
+    const lead = i.leadDays != null ? `${i.leadDays}${t('days')}` : i.ageDays != null ? `${i.ageDays}${t('days')} ${t('ago')}` : '';
+    const tr = el('tr', { class: 'item', tabindex: 0, 'aria-expanded': String(st.open.includes(i.key)) },
+      el('td', {}, el('span', { class: 'status' }, el('i', { style: `background:${color}` }), t(sk))),
+      el('td', { class: 'title' }, i.title, el('span', { class: 'chip' }, i.key.startsWith('~') ? '—' : i.key)),
+      el('td', { class: 'num' }, `${i.size} · ${i.points}`),
+      el('td', {}, i.decided || ''),
+      el('td', {}, i.done || i.cut || ''),
+      el('td', { class: 'num' }, lead),
+      el('td', { class: 'num' }, i.usd ? fmtUsdShort(i.usd) : ''));
+    const toggle = () => { st.open = st.open.includes(i.key) ? st.open.filter((k) => k !== i.key) : [...st.open, i.key]; update(); };
+    tr.addEventListener('click', toggle);
+    tr.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
+    body.append(tr);
+    if (st.open.includes(i.key)) {
+      body.append(el('tr', { class: 'detail' }, el('td', { colspan: cols.length }, [
+        i.group ? i.group : null,
+        i.parent ? `${t('parent')} {${i.parent}}` : null,
+        i.start ? `${t('start')} ${i.start}` : null,
+        i.paused ? `${t('paused')} ${i.paused}` : null,
+        i.usd ? `${t('cost')} ${fmtUsd(i.usd)}${i.usdViaCommits ? ` (${fmtUsd(i.usdViaCommits)} ${t('viaCommits')})` : ''}` : null,
+      ].filter(Boolean).join(' · ') || '—')));
+    }
+  }
+  return el('section', { class: 'card' },
+    el('div', { class: 'card-head' }, el('h2', {}, `${t('items')} (${p.items.length})`), el('span', { class: 'spacer' }), search),
+    p.spend.total ? el('p', { class: 'sub' }, `${t('outside')}: ${fmtUsd(p.spend.outside)}${p.spend.taggedCommits ? ` · ${p.spend.taggedCommits} ${t('viaCommits')}` : ''}`) : null,
+    el('div', { style: 'overflow-x:auto' }, el('table', {},
+      el('thead', {}, el('tr', {}, cols.map(([k, label, cls]) => el('th', { class: cls, 'aria-sort': st.sort === k ? (st.dir > 0 ? 'ascending' : 'descending') : null },
+        el('button', { onclick: () => { if (st.sort === k) st.dir = -st.dir; else { st.sort = k; st.dir = k === 'usd' || k === 'lead' ? -1 : 1; } update(); } }, label + (st.sort === k ? (st.dir > 0 ? ' ↑' : ' ↓') : '')))))),
+      body)));
+}
+
+// ---------- main ----------
+function update() {
+  writeHash();
+  renderControls();
+  const rows = filteredRows();
+  renderTiles(rows);
+  renderDaily(rows);
+  renderByProject(rows);
+  renderCards();
+  renderDetail();
+  $('foot').textContent = `${t('prices')}: ${DATA.prices.source} (${DATA.prices.checked})${DATA.prices.unpriced.length ? ` · ${t('unpriced')}: ${DATA.prices.unpriced.join(', ')}` : ''} · scopeburn`;
+}
+let rt;
+addEventListener('resize', () => { clearTimeout(rt); rt = setTimeout(update, 150); });
+addEventListener('hashchange', () => { readHash(); update(); });
+matchMedia('(prefers-color-scheme: dark)').addEventListener('change', update);
+update();
+if (LIVE) setInterval(async () => {
+  try { const r = await fetch('data.json', { cache: 'no-store' }); if (r.ok) { DATA = await r.json(); update(); } } catch {}
+}, 60000);
+})();
+</script>
+</body>
+</html>

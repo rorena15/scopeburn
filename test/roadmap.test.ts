@@ -77,3 +77,8 @@ test('date tags rebuild past states before the first recorded snapshot', async (
     ['2026-09-04', 4, 2, 2],
   ]);
 });
+
+test('checkboxes inside HTML comments are format notes, not items', () => {
+  const r = parseRoadmap('<!--\n  - [ ] open   - [x] done\n-->\n<!-- - [ ] {X} one-line note -->\n- [ ] {A} real');
+  assert.deepEqual(r.items.map((i) => i.key), ['A']);
+});

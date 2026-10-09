@@ -64,13 +64,23 @@ export function parseRoadmap(md: string): Roadmap {
   const stack: [number, string][] = [];
   const seen = new Set<string>();
 
+  let inComment = false;
   md.split(/\r?\n/).forEach((raw, i) => {
     const line = i + 1;
-    if (/^\s*```/.test(raw)) {
+    if (!inComment && /^\s*```/.test(raw)) {
       inFence = !inFence;
       return;
     }
     if (inFence) return;
+    // <!-- ... --> blocks hold notes and format examples, never items
+    if (inComment) {
+      if (raw.includes('-->')) inComment = false;
+      return;
+    }
+    if (/^\s*<!--/.test(raw)) {
+      if (!raw.includes('-->')) inComment = true;
+      return;
+    }
     const st = /^stage:\s*([a-z]+)\s*$/i.exec(raw);
     if (st) {
       const v = st[1].toLowerCase() as Stage;
