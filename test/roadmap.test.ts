@@ -66,6 +66,13 @@ test('growth ratio compares scope added to work done over 14 days', () => {
   assert.deepEqual(sum.waiting.map((t) => t.item.key), ['B', 'C', 'D']);
 });
 
+test('paused items are listed as paused, not also as waiting', () => {
+  const s = snap('2026-09-30', '- [ ] {A} a @decided(2026-09-20) @paused(2026-09-25)\n- [ ] {B} b @decided(2026-09-20)');
+  const sum = summarize([s], '2026-10-01')!;
+  assert.deepEqual(sum.waiting.map((t) => t.item.key), ['B']);
+  assert.deepEqual(sum.paused.map((t) => t.item.key), ['A']);
+});
+
 test('date tags rebuild past states before the first recorded snapshot', async () => {
   const { snapshotsFromTags } = await import('../src/history.ts');
   const r = parseRoadmap('- [x] {A} a @decided(2026-09-01) @done(2026-09-03)\n- [-] {B} b @decided(2026-09-02) @cut(2026-09-04)\n- [ ] {C} c');
