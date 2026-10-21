@@ -2,6 +2,24 @@
   "name": "scopeburn",
   "version": "0.0.1",
   "description": "Roadmap burn-up meets Claude Code token cost: see scope creep, per-item cost, and how much it will take to finish.",
+  "keywords": [
+    "claude-code",
+    "claude",
+    "token-usage",
+    "cost",
+    "roadmap",
+    "burn-up",
+    "cli"
+  ],
+  "author": "rorena15",
+  "homepage": "https://github.com/rorena15/scopeburn#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rorena15/scopeburn.git"
+  },
+  "bugs": {
+    "url": "https://github.com/rorena15/scopeburn/issues"
+  },
   "type": "module",
   "bin": {
     "scopeburn": "dist/scopeburn.js"
@@ -19,7 +37,8 @@
     "build": "esbuild src/cli.ts --bundle --platform=node --format=esm --target=node18 --loader:.html=text --loader:.md=text --outfile=dist/scopeburn.js --banner:js=\"#!/usr/bin/env node\"",
     "build:plugin": "node scripts/build-plugin.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "node --test test/*.test.ts"
+    "test": "node --test test/*.test.ts",
+    "prepublishOnly": "npm run typecheck && npm test && npm run build"
   },
   "devDependencies": {
     "@types/node": "^26.6.4",
