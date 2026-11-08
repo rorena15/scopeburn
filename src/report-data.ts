@@ -1,5 +1,4 @@
-// The data embedded in the dashboard. Numbers, project names and roadmap item titles only:
-// no conversation text, commands or file contents.
+// Dashboard data includes roadmap titles and notes; redact notes before sharing.
 import * as path from 'node:path';
 import { attribute, UNATTRIBUTED } from './attribute.ts';
 import { analyzeProjects, discoverRoadmapRoots } from './analyze.ts';
@@ -14,6 +13,7 @@ import { readSamples } from './statusline.ts';
 export interface ReportItem {
   key: string;
   title: string;
+  note: string | null;
   group: string | null;
   parent: string | null;
   status: Status;
@@ -71,6 +71,13 @@ const localDay = (ts: number) => {
 };
 
 const round = (x: number, d = 4) => Math.round(x * 10 ** d) / 10 ** d;
+
+export function splitItemTitle(text: string): { title: string; note: string | null } {
+  const at = text.indexOf(' — ');
+  if (at < 0) return { title: text, note: null };
+  const note = text.slice(at + 3).replace(/@(decided|start|paused|done|cut)\([^)]*\)/g, '').replace(/\s+/g, ' ').trim();
+  return { title: text.slice(0, at).trim(), note: note || null };
+}
 
 export function buildReportData(records: UsageRecord[], prices: PriceTable, cfg: Config): ReportData {
   const usage = attribute(records);
@@ -130,7 +137,7 @@ export function buildReportData(records: UsageRecord[], prices: PriceTable, cfg:
       const c = p.costs.byItem.get(t.item.key);
       return {
         key: t.item.key,
-        title: t.item.title,
+        ...splitItemTitle(t.item.title),
         group: t.item.group,
         parent: t.item.parent,
         status: t.item.status,

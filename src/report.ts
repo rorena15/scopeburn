@@ -34,10 +34,26 @@ export function redact(data: ReportData): ReportData {
     p.name = alias(p.name);
     p.key = p.name;
     p.warnings = [];
+    // Keys without explicit {ID}s are slugs of the entire original line, including notes.
+    const keys = new Map<string, string>();
+    const itemKey = (key: string) => {
+      if (!key.startsWith('~')) return key;
+      if (!keys.has(key)) keys.set(key, `~item-${keys.size + 1}`);
+      return keys.get(key)!;
+    };
     for (const it of p.items) {
+      it.note = null;
+      it.key = itemKey(it.key);
+      it.parent = it.parent ? itemKey(it.parent) : null;
       it.title = it.key.startsWith('~') ? 'item' : it.key;
       it.group = it.group ? 'group' : null;
     }
+    for (const point of p.burnup) {
+      point.added = point.added.map(itemKey);
+      point.completed = point.completed.map(itemKey);
+      point.cutItems = point.cutItems.map(itemKey);
+    }
+    p.doneMix.reactiveItems = p.doneMix.reactiveItems.map(itemKey);
   }
   return d;
 }
