@@ -1,6 +1,6 @@
 {
   "name": "scopeburn",
-  "version": "0.0.1",
+  "version": "0.1.0",
   "description": "Roadmap burn-up meets Claude Code token cost: see scope creep, per-item cost, and how much it will take to finish.",
   "keywords": [
     "claude-code",
